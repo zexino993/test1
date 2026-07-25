@@ -51,7 +51,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚔️ Terraria Sprite Master Studio v18.0")
+st.title("⚔️ Terraria Sprite Master Studio v18.1")
 st.caption("Studio All-in-One: **Full Sprite Pulse**, **Directional Waves**, **15 Textures**, & **Sprite Sheet Generator**.")
 
 # ==========================================
@@ -178,6 +178,7 @@ with st.expander("🎛️ PANEL KONTROL & PENGATURAN SPRITE (KLIK UNTUK BUKA / T
         tex_secondary = st.selectbox("Tekstur Kedua:", options=[('Tidak Ada', 'none')] + TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
         blend_ratio = st.slider("Rasio Blend Tekstur", 0.0, 1.0, 0.3, 0.05)
         tex_intensity = st.slider("Kekuatan Tekstur", 0.0, 1.0, 0.35, 0.05)
+        depth_mult = st.slider("Intensitas 3D Depth", 0.5, 3.0, 1.5, 0.1)
         
         st.markdown("##### 💡 5. Glow & Pulse")
         threshold = st.slider("Sensitivitas Glow Area", 0.1, 0.9, 0.45, 0.02)
@@ -353,23 +354,18 @@ def render_studio_all(arr, extra_hue=0):
 
     return out_img, glow_img, lum, glow_alpha
 
-# PENGHASIL ANIMASI DENYUT (DENGAN TARGET AREA)
 def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensity, p_direction, p_target):
     base_rgb = np.array(out_img, dtype=np.float32)[:, :, :3]
     alpha_arr = np.array(out_img)[:, :, 3:]
     height, width = glow_alpha.shape
 
-    # Menentukan area mana yang akan diberi efek denyut
     if p_target == "Seluruh Sprite":
-        # Gunakan alpha channel sebagai mask agar background tetap aman
         mask_norm = (alpha_arr.astype(np.float32) / 255.0)
     else:
-        # Hanya gunakan area glow yang terang
         mask_norm = np.expand_dims((glow_alpha.astype(np.float32) / 255.0), axis=-1)
 
     t = frame_idx / float(total_frames)
 
-    # Kalkulasi Gelombang Denyut Berarah
     if p_direction == "Dari Atas ⬇️":
         y_indices, _ = np.indices((height, width), dtype=np.float32)
         y_norm = y_indices / max(1.0, height - 1.0)
@@ -386,13 +382,12 @@ def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensi
         _, x_indices = np.indices((height, width), dtype=np.float32)
         x_norm = x_indices / max(1.0, width - 1.0)
         pulse_val = (np.sin(2.0 * np.pi * (t - (1.0 - x_norm))) + 1.0) * 0.5
-    else:  # "Seperti Biasa (Uniform)"
+    else:
         pulse_val = (math.sin(2.0 * math.pi * t) + 1.0) * 0.5
 
     if isinstance(pulse_val, np.ndarray):
         pulse_val = np.expand_dims(pulse_val, axis=-1)
 
-    # Terapkan denyut hanya pada mask target
     pulse_factor = pulse_val * p_intensity
     boosted_rgb = base_rgb + (base_rgb * 0.6 + 60.0) * mask_norm * pulse_factor
     boosted_rgb = np.clip(boosted_rgb, 0, 255).astype(np.uint8)
