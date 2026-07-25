@@ -4,10 +4,10 @@ from PIL import Image
 import io
 import base64
 
-st.set_page_config(page_title="2D PNG Shader Studio Demo", layout="wide")
+st.set_page_config(page_title="2D PNG Shader Studio & GIF Exporter", layout="wide")
 
-st.title("🖼️ Custom PNG Sprite .FX Shader Engine")
-st.caption("Unggah gambar PNG transparan milikmu dan terapkan efek Pixel Shader (`.fx` / WebGL) secara real-time!")
+st.title("🖼️ Custom PNG Sprite .FX Shader & GIF Exporter")
+st.caption("Unggah gambar PNG transparan, atur efek shader real-time, dan rekam hasilnya menjadi file GIF animasi!")
 
 # ==========================================
 # 1. INPUT FILE & SHADER CONTROLS
@@ -37,6 +37,10 @@ with col_ctrl:
     
     fx_color = st.color_picker("Warna Utama FX Shader:", "#FF3300" if "Lava" in fx_choice else "#00FFFF")
 
+    st.markdown("---")
+    st.subheader("🎬 3. Rekam GIF")
+    gif_duration = st.slider("Durasi Rekaman GIF (Detik):", 1, 5, 2)
+
 # Convert Color HEX to RGB (0.0 - 1.0)
 color_hex_clean = fx_color.lstrip('#')
 r_val = int(color_hex_clean[0:2], 16) / 255.0
@@ -47,7 +51,6 @@ b_val = int(color_hex_clean[4:6], 16) / 255.0
 # 2. PROSES IMAGE BASE64 & SHADER ENGINE
 # ==========================================
 if uploaded_file is not None:
-    # Convert uploaded image to Base64 for WebGL Texture Embedding
     input_image = Image.open(uploaded_file).convert("RGBA")
     buffered = io.BytesIO()
     input_image.save(buffered, format="PNG")
@@ -67,13 +70,8 @@ if uploaded_file is not None:
 
             void main() {
                 vec4 texColor = texture2D(u_texture, vUv);
-                
-                // Jika piksel transparan, jangan di-render
-                if (texColor.a < 0.1) {
-                    discard;
-                }
+                if (texColor.a < 0.1) { discard; }
 
-                // Kalkulasi Pola Lava di dalam Sprite
                 float noise = sin(vUv.x * u_scale + u_time * u_speed) * cos(vUv.y * u_scale + u_time * u_speed);
                 float vein = smoothstep(0.1, 0.5, abs(noise));
                 
@@ -93,9 +91,7 @@ if uploaded_file is not None:
 
             void main() {
                 vec4 texColor = texture2D(u_texture, vUv);
-                if (texColor.a < 0.1) {
-                    discard;
-                }
+                if (texColor.a < 0.1) { discard; }
 
                 float scanline = sin(vUv.y * u_scale - u_time * u_speed * 4.0) * 0.5 + 0.5;
                 scanline = pow(scanline, 2.0) * u_intensity;
@@ -116,20 +112,16 @@ if uploaded_file is not None:
 
             void main() {
                 vec4 texColor = texture2D(u_texture, vUv);
-                
-                // Efek Aura Luar
                 float pulse = sin(u_time * u_speed * 3.0) * 0.3 + 0.7;
                 vec3 auraColor = u_color * u_intensity * pulse;
 
-                if (texColor.a < 0.1) {
-                    discard;
-                }
+                if (texColor.a < 0.1) { discard; }
 
                 vec3 finalColor = mix(texColor.rgb, auraColor, 0.4);
                 gl_FragColor = vec4(finalColor, texColor.a);
             }
         """
-    else: # Rainbow Wave
+    else: # Rainbow
         fragment_shader = """
             uniform sampler2D u_texture;
             uniform float u_time;
@@ -140,9 +132,7 @@ if uploaded_file is not None:
 
             void main() {
                 vec4 texColor = texture2D(u_texture, vUv);
-                if (texColor.a < 0.1) {
-                    discard;
-                }
+                if (texColor.a < 0.1) { discard; }
 
                 float rainbow = vUv.x + vUv.y + u_time * u_speed * 0.5;
                 vec3 rainbowColor = 0.5 + 0.5 * cos(rainbow * 6.28318 + vec3(0.0, 2.0, 4.0));
@@ -160,29 +150,61 @@ if uploaded_file is not None:
         }
     """
 
-    # HTML / WEBGL EMBED ENGINE
+    # HTML / WEBGL / CCAPTURE EMBED ENGINE
     html_png_shader_code = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <style>
-            body {{ margin: 0; overflow: hidden; background: #0b0712; display: flex; justify-content: center; align-items: center; height: 100vh; }}
-            canvas {{ max-width: 100%; max-height: 100%; display: block; image-rendering: pixelated; }}
+            body {{ margin: 0; overflow: hidden; background: #0b0712; font-family: sans-serif; text-align: center; color: white; }}
+            #container {{ display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }}
+            canvas {{ max-width: 90%; max-height: 70vh; display: block; image-rendering: pixelated; margin-bottom: 15px; }}
+            .btn {{
+                background: linear-gradient(135deg, #8a2be2, #4b0082);
+                color: white; border: 1px solid #d4a5ff; border-radius: 8px;
+                padding: 10px 20px; font-weight: bold; cursor: pointer; font-size: 14px;
+                transition: all 0.3s ease;
+            }}
+            .btn:hover {{ background: linear-gradient(135deg, #a34bfb, #6a0ded); box-shadow: 0 0 12px rgba(163, 75, 251, 0.6); }}
+            #status {{ margin-top: 10px; font-size: 13px; color: #a3f3ff; font-weight: bold; }}
         </style>
+
+        <!-- Library External Untuk Perekaman WebGL & Export GIF -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/build/CCapture.all.min.js"></script>
     </head>
     <body>
-        <canvas id="canvas"></canvas>
+        <div id="container">
+            <canvas id="canvas"></canvas>
+            <div>
+                <button id="recBtn" class="btn" onclick="startRecording()">🔴 Rekam & Buat GIF ({gif_duration}s)</button>
+            </div>
+            <div id="status">Tampilan Real-time (Klik tombol di atas untuk mengunduh GIF)</div>
+        </div>
 
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
         <script>
             const canvas = document.getElementById('canvas');
-            const renderer = new THREE.WebGLRenderer({{ canvas, antialias: true, alpha: true }});
+            const statusDiv = document.getElementById('status');
+            const recBtn = document.getElementById('recBtn');
+
+            const renderer = new THREE.WebGLRenderer({{ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true }});
             renderer.setPixelRatio(window.devicePixelRatio);
 
             const scene = new THREE.Scene();
             const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-            // Load PNG Texture from Base64
+            // Inisialisasi Perekam GIF (CCapture)
+            const capturer = new CCapture({{
+                format: 'gif',
+                workersPath: 'https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/src/',
+                framerate: 20,
+                quality: 10
+            }});
+
+            let isRecording = false;
+            let recordDuration = {gif_duration};
+            let startTime = 0;
+
             const loader = new THREE.TextureLoader();
             loader.load('{img_data_url}', (texture) => {{
                 texture.minFilter = THREE.NearestFilter;
@@ -211,25 +233,51 @@ if uploaded_file is not None:
                 const mesh = new THREE.Mesh(geometry, material);
                 scene.add(mesh);
 
-                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setSize(400, 400);
 
-                const clock = new THREE.Clock();
+                let simTime = 0;
                 function animate() {{
                     requestAnimationFrame(animate);
-                    uniforms.u_time.value = clock.getElapsedTime();
+                    
+                    simTime += 0.03;
+                    uniforms.u_time.value = simTime;
                     renderer.render(scene, camera);
+
+                    if (isRecording) {{
+                        capturer.capture(canvas);
+                        let elapsed = (Date.now() - startTime) / 1000;
+                        statusDiv.innerText = "⏳ Merekam Frame GPU: " + elapsed.toFixed(1) + "s / " + recordDuration + "s";
+                        
+                        if (elapsed >= recordDuration) {{
+                            isRecording = false;
+                            statusDiv.innerText = "⚙️ Mengompresi GIF... Mohon tunggu beberapa detik...";
+                            recBtn.disabled = false;
+                            capturer.stop();
+                            capturer.save((blob) => {{
+                                statusDiv.innerText = "✅ GIF Berhasil Diunduh!";
+                            }});
+                        }}
+                    }}
                 }}
                 animate();
             }});
+
+            function startRecording() {{
+                isRecording = true;
+                recBtn.disabled = true;
+                startTime = Date.now();
+                statusDiv.innerText = "🔴 Memulai Perekaman...";
+                capturer.start();
+            }}
         </script>
     </body>
     </html>
     """
 
     with col_view:
-        st.subheader("📺 Hasil Visual PNG + FX Shader")
-        components.html(html_png_shader_code, height=550)
+        st.subheader("📺 Hasil Visual & Modul Download GIF")
+        components.html(html_png_shader_code, height=580)
 
 else:
     with col_view:
-        st.info("👈 Silakan unggah gambar PNG transparan di menu sebelah kiri untuk melihat efek shader!")
+        st.info("👈 Silakan unggah gambar PNG transparan di menu sebelah kiri untuk memulai studio & mengunduh GIF!")
