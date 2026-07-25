@@ -51,8 +51,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚔️ Terraria Sprite Master Studio v17.0")
-st.caption("Studio All-in-One: **Top Control Panel**, **Directional Pulse**, **15 Textures**, & **Sprite Sheet Generator**.")
+st.title("⚔️ Terraria Sprite Master Studio v18.0")
+st.caption("Studio All-in-One: **Full Sprite Pulse**, **Directional Waves**, **15 Textures**, & **Sprite Sheet Generator**.")
 
 # ==========================================
 # 2. PRESET PALET WARNA & TEKSTUR LIST
@@ -178,13 +178,18 @@ with st.expander("🎛️ PANEL KONTROL & PENGATURAN SPRITE (KLIK UNTUK BUKA / T
         tex_secondary = st.selectbox("Tekstur Kedua:", options=[('Tidak Ada', 'none')] + TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
         blend_ratio = st.slider("Rasio Blend Tekstur", 0.0, 1.0, 0.3, 0.05)
         tex_intensity = st.slider("Kekuatan Tekstur", 0.0, 1.0, 0.35, 0.05)
-        depth_mult = st.slider("Intensitas 3D Depth", 0.5, 3.0, 1.5, 0.1)
+        
+        st.markdown("##### 💡 5. Glow & Pulse")
         threshold = st.slider("Sensitivitas Glow Area", 0.1, 0.9, 0.45, 0.02)
-        pulse_intensity = st.slider("Kekuatan Denyut Pulse", 0.1, 1.0, 0.5, 0.05)
+        pulse_target = st.selectbox(
+            "Target Area Denyut (Pulse Target):",
+            ["Hanya Area Glow", "Seluruh Sprite"]
+        )
         pulse_direction = st.selectbox(
             "Arah Denyut Pulse:",
             ["Seperti Biasa (Uniform)", "Dari Atas ⬇️", "Dari Bawah ⬆️", "Dari Kiri ➡️", "Dari Kanan ⬅️"]
         )
+        pulse_intensity = st.slider("Kekuatan Denyut Pulse", 0.1, 1.0, 0.5, 0.05)
 
 # ==========================================
 # 4. HELPER & CORE ENGINE FUNCTIONS
@@ -348,14 +353,23 @@ def render_studio_all(arr, extra_hue=0):
 
     return out_img, glow_img, lum, glow_alpha
 
-def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensity, p_direction):
+# PENGHASIL ANIMASI DENYUT (DENGAN TARGET AREA)
+def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensity, p_direction, p_target):
     base_rgb = np.array(out_img, dtype=np.float32)[:, :, :3]
     alpha_arr = np.array(out_img)[:, :, 3:]
-    glow_mask_norm = np.expand_dims((glow_alpha.astype(np.float32) / 255.0), axis=-1)
     height, width = glow_alpha.shape
+
+    # Menentukan area mana yang akan diberi efek denyut
+    if p_target == "Seluruh Sprite":
+        # Gunakan alpha channel sebagai mask agar background tetap aman
+        mask_norm = (alpha_arr.astype(np.float32) / 255.0)
+    else:
+        # Hanya gunakan area glow yang terang
+        mask_norm = np.expand_dims((glow_alpha.astype(np.float32) / 255.0), axis=-1)
 
     t = frame_idx / float(total_frames)
 
+    # Kalkulasi Gelombang Denyut Berarah
     if p_direction == "Dari Atas ⬇️":
         y_indices, _ = np.indices((height, width), dtype=np.float32)
         y_norm = y_indices / max(1.0, height - 1.0)
@@ -378,8 +392,9 @@ def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensi
     if isinstance(pulse_val, np.ndarray):
         pulse_val = np.expand_dims(pulse_val, axis=-1)
 
+    # Terapkan denyut hanya pada mask target
     pulse_factor = pulse_val * p_intensity
-    boosted_rgb = base_rgb + (base_rgb * 0.6 + 60.0) * glow_mask_norm * pulse_factor
+    boosted_rgb = base_rgb + (base_rgb * 0.6 + 60.0) * mask_norm * pulse_factor
     boosted_rgb = np.clip(boosted_rgb, 0, 255).astype(np.uint8)
 
     return Image.fromarray(np.dstack((boosted_rgb, alpha_arr.astype(np.uint8))), mode="RGBA")
@@ -480,7 +495,7 @@ if uploaded_file is not None:
             
             if sheet_anim_type == "Glow Pulse Frames":
                 for i in range(frame_count):
-                    f_img = generate_pulse_frame(out_img, glow_alpha, i, frame_count, pulse_intensity, pulse_direction)
+                    f_img = generate_pulse_frame(out_img, glow_alpha, i, frame_count, pulse_intensity, pulse_direction, pulse_target)
                     sheet_frames.append(f_img)
                     
             elif sheet_anim_type == "RGB Rainbow Hue Cycle":
@@ -501,11 +516,12 @@ if uploaded_file is not None:
             spritesheet_img.save(buf_ss, format="PNG")
             st.session_state['spritesheet_bytes'] = buf_ss.getvalue()
             st.session_state['spritesheet_size'] = spritesheet_img.size
+            st.session_state['spritesheet_info'] = f"Arah: {pulse_direction} | Target: {pulse_target}"
 
         if 'spritesheet_bytes' in st.session_state:
             st.divider()
             sw, sh = st.session_state['spritesheet_size']
-            st.write(f"📐 **Ukuran Sprite Sheet:** `{sw} x {sh} pixels` | Arah: **{pulse_direction}**")
+            st.write(f"📐 **Ukuran Sprite Sheet:** `{sw} x {sh} pixels` | {st.session_state.get('spritesheet_info', '')}")
             
             ss_preview_img = Image.open(io.BytesIO(st.session_state['spritesheet_bytes']))
             st.image(ss_preview_img.resize((sw * max(1, zoom//2), sh * max(1, zoom//2)), Image.NEAREST))
@@ -523,12 +539,13 @@ if uploaded_file is not None:
         gif_col1, gif_col2 = st.columns(2)
 
         with gif_col1:
-            st.write(f"**1. Glow Pulse Animation ({pulse_direction})**")
+            st.write(f"**1. Animasi Pulse ({pulse_target})**")
+            st.caption(f"Arah: {pulse_direction}")
             if st.button("Preview Glow Pulse GIF 🎬", key="btn_pulse_prev", use_container_width=True):
                 frames = []
                 num_frames = 12
                 for i in range(num_frames):
-                    f_img = generate_pulse_frame(out_img, glow_alpha, i, num_frames, pulse_intensity, pulse_direction)
+                    f_img = generate_pulse_frame(out_img, glow_alpha, i, num_frames, pulse_intensity, pulse_direction, pulse_target)
                     if zoom > 1: f_img = f_img.resize((w * zoom, h * zoom), Image.NEAREST)
                     frames.append(f_img)
 
@@ -541,6 +558,7 @@ if uploaded_file is not None:
 
         with gif_col2:
             st.write("**2. RGB / Rainbow Cycle Animation**")
+            st.caption("Gelombang Pergeseran Warna Spektrum (360 Derajat)")
             if st.button("Preview RGB Cycle GIF 🌈", key="btn_rgb_prev", use_container_width=True):
                 frames_rgb = []
                 for h_shift in range(0, 360, 30):
