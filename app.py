@@ -46,12 +46,33 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚔️ Terraria Sprite Master Studio v14.1")
+st.title("⚔️ Terraria Sprite Master Studio v14.2")
 st.caption("Studio All-in-One: **Sprite Recoloring**, **GIF Animation**, & **Custom Sprite Sheet Generator**.")
 
 # ==========================================
-# 2. PRESET PALET WARNA LENGKAP
+# 2. PRESET PALET WARNA LENGKAP & MAPPING
 # ==========================================
+PRESET_NAMES = {
+    'manual': 'Custom (Manual)',
+    'true_nights_edge': "⚔️ True Night's Edge",
+    'terra_blade': '🌿 Terra Blade Green',
+    'excalibur': '🗡️ Excalibur Holy Gold',
+    'meowmere': '🐱 Meowmere Rainbow',
+    'zenith': '🌌 Zenith Dark Cosmic',
+    'vampire_crimson': '🩸 Vampire Crimson',
+    'pastel_cotton_candy': '🌸 Pastel Cotton Candy',
+    'pastel_mint': '🍵 Pastel Mint Matcha',
+    'pastel_lavender': '💜 Pastel Soft Lavender',
+    'pastel_peach': '🍑 Pastel Peach Cream',
+    'hellstone': '🔥 Hellstone Flame',
+    'chlorophyte': '🌿 Chlorophyte Green',
+    'luminite': '🌌 Luminite Cosmic',
+    'cobalt': '🔷 Cobalt Blue',
+    'orichalcum': '🌸 Orichalcum Pink',
+    'adamantite': '🔴 Adamantite Red',
+    'shroomite': '🍄 Shroomite Cyan'
+}
+
 PRESETS = {
     'manual': None,
     'true_nights_edge': {'shadow': '#0f001e', 'mid': '#5a189a', 'glow': '#00ffcc'},
@@ -67,10 +88,13 @@ PRESETS = {
     'hellstone': {'shadow': '#1a0000', 'mid': '#e63900', 'glow': '#ffcc00'},
     'chlorophyte': {'shadow': '#0a2000', 'mid': '#2ecc71', 'glow': '#a3ff00'},
     'luminite': {'shadow': '#001f24', 'mid': '#00b894', 'glow': '#81ecec'},
+    'cobalt': {'shadow': '#001133', 'mid': '#0984e3', 'glow': '#74b9ff'},
+    'orichalcum': {'shadow': '#2d001e', 'mid': '#e84393', 'glow': '#ff7675'},
+    'adamantite': {'shadow': '#2b0000', 'mid': '#d63031', 'glow': '#ff7675'},
     'shroomite': {'shadow': '#000a1a', 'mid': '#0055ff', 'glow': '#00e1ff'}
 }
 
-# Session State Setup (Direct Widget Key Management)
+# Session State Setup (Kunci Widget)
 if 'shadow_picker' not in st.session_state: st.session_state.shadow_picker = "#080214"
 if 'mid_picker' not in st.session_state: st.session_state.mid_picker = "#AA19F5"
 if 'glow_picker' not in st.session_state: st.session_state.glow_picker = "#FF78FF"
@@ -82,8 +106,7 @@ def on_preset_change():
         st.session_state.shadow_picker = PRESETS[p_key]['shadow']
         st.session_state.mid_picker = PRESETS[p_key]['mid']
         st.session_state.glow_picker = PRESETS[p_key]['glow']
-        if 'pastel' in p_key:
-            st.session_state.pastel_mode_val = True
+        st.session_state.pastel_mode_val = ('pastel' in p_key)
 
 # ==========================================
 # 3. SIDEBAR CONTROLS
@@ -97,31 +120,21 @@ sprite_type = st.sidebar.selectbox(
 )
 
 use_orig_color = st.sidebar.checkbox("🔒 Gunakan Warna Asli (Matikan Recolor)", value=False)
-pastel_mode = st.sidebar.checkbox("🌸 Soft RGB Pastel Tone", value=st.session_state.pastel_mode_val, key="pastel_mode_val")
+if use_orig_color:
+    st.sidebar.caption("⚠️ *Fitur Recolor & Preset dinonaktifkan karena 'Warna Asli' aktif.*")
+
+pastel_mode = st.sidebar.checkbox("🌸 Soft RGB Pastel Tone", key="pastel_mode_val")
 zoom = st.sidebar.slider("🔍 Zoom Magnifier", 1, 10, 4)
 
 with st.sidebar.expander("🎨 2. Presets & Warna Palette", expanded=True):
     st.selectbox(
         "Pilih Preset Sprite:",
-        options=[
-            ('Custom (Manual)', 'manual'),
-            ('⚔️ True Night\'s Edge', 'true_nights_edge'),
-            ('🌿 Terra Blade Green', 'terra_blade'),
-            ('🗡️ Excalibur Holy Gold', 'excalibur'),
-            ('🐱 Meowmere Rainbow', 'meowmere'),
-            ('🌌 Zenith Dark Cosmic', 'zenith'),
-            ('🩸 Vampire Crimson', 'vampire_crimson'),
-            ('🌸 Pastel Cotton Candy', 'pastel_cotton_candy'),
-            ('🍵 Pastel Mint Matcha', 'pastel_mint'),
-            ('🔥 Hellstone Flame', 'hellstone'),
-            ('🌌 Luminite Cosmic', 'luminite')
-        ],
-        format_func=lambda x: x[0],
+        options=list(PRESET_NAMES.keys()),
+        format_func=lambda x: PRESET_NAMES.get(x, x),
         key="preset_choice",
         on_change=on_preset_change
     )
     
-    # Langsung menggunakan key sebagai penyimpan state resmi Streamlit
     shadow_color = st.color_picker("1. Shadow Celah", key="shadow_picker")
     mid_color = st.color_picker("2. Warna Utama", key="mid_picker")
     glow_color = st.color_picker("3. Glow Highlight", key="glow_picker")
@@ -259,7 +272,7 @@ def render_studio_all(arr, extra_hue=0):
         gray = np.expand_dims(0.299 * out_rgb[:, :, 0] + 0.587 * out_rgb[:, :, 1] + 0.114 * out_rgb[:, :, 2], axis=-1)
         out_rgb = gray + vibrancy * (out_rgb - gray)
 
-        if pastel_mode:
+        if st.session_state.pastel_mode_val:
             out_rgb = out_rgb * 0.6 + 255.0 * 0.4 * (out_rgb / 255.0)**0.5
 
         out_rgb = np.clip(out_rgb, 0, 255).astype(np.uint8)
@@ -269,13 +282,11 @@ def render_studio_all(arr, extra_hue=0):
         glow_alpha = np.where((final_lum >= threshold) & (alpha_uint8 > 0), alpha_uint8, 0).astype(np.uint8)
         glow_img = Image.fromarray(np.dstack((out_rgb, glow_alpha)), mode="RGBA")
 
-    # Brightness & Contrast
     if brightness != 1.0:
         out_img = ImageEnhance.Brightness(out_img).enhance(brightness)
     if contrast != 1.0:
         out_img = ImageEnhance.Contrast(out_img).enhance(contrast)
 
-    # Outline / Border
     if enable_outline:
         if outline_color_mode == "Black (Terraria Classic)":
             b_color = (0, 0, 0, 255)
@@ -324,7 +335,6 @@ if uploaded_file is not None:
     glow_z = glow_img.resize((w * zoom, h * zoom), Image.NEAREST)
     rgb_z = rgb_shift_img.resize((w * zoom, h * zoom), Image.NEAREST)
 
-    # Tabs Navigation
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "🖼️ Quad-Preview Matrix", 
         "🧩 3x3 Tile Grid Test", 
