@@ -4,10 +4,10 @@ from PIL import Image
 import io
 import base64
 
-st.set_page_config(page_title="2D PNG Shader Studio v3.0", layout="wide")
+st.set_page_config(page_title="2D PNG Shader Studio v3.1 (Fast GIF)", layout="wide")
 
-st.title("🖼️ Custom PNG Sprite .FX Shader Studio v3.0")
-st.caption("Unggah gambar PNG transparan, eksplorasi **10 FX Shader Pro**, dan rekam hasilnya menjadi GIF animasi!")
+st.title("🖼️ Custom PNG Sprite .FX Shader Studio v3.1")
+st.caption("Unggah gambar PNG transparan, eksplorasi **10 FX Shader Pro**, dan rekam GIF dengan **Fast Compression Engine**!")
 
 # ==========================================
 # 1. INPUT FILE & SHADER CONTROLS
@@ -48,8 +48,9 @@ with col_ctrl:
     )
 
     st.markdown("---")
-    st.subheader("🎬 3. Rekam GIF")
+    st.subheader("🎬 3. Rekam Fast GIF")
     gif_duration = st.slider("Durasi Rekaman GIF (Detik):", 1, 5, 2)
+    gif_fps = st.select_slider("Frame Rate (FPS):", options=[12, 15, 20], value=15)
 
 # Convert Color HEX to RGB (0.0 - 1.0)
 color_hex_clean = fx_color.lstrip('#')
@@ -262,7 +263,7 @@ if uploaded_file is not None:
         }
     """
 
-    # HTML / WEBGL / CCAPTURE EMBED ENGINE
+    # HTML / WEBGL / FAST CCAPTURE EMBED ENGINE
     html_png_shader_code = f"""
     <!DOCTYPE html>
     <html>
@@ -288,7 +289,7 @@ if uploaded_file is not None:
         <div id="container">
             <canvas id="canvas"></canvas>
             <div>
-                <button id="recBtn" class="btn" onclick="startRecording()">🔴 Rekam & Buat GIF ({gif_duration}s)</button>
+                <button id="recBtn" class="btn" onclick="startRecording()">⚡ Rekam & Buat Fast GIF ({gif_duration}s @ {gif_fps}fps)</button>
             </div>
             <div id="status">Tampilan Real-time (Klik tombol di atas untuk mengunduh GIF)</div>
         </div>
@@ -299,16 +300,18 @@ if uploaded_file is not None:
             const recBtn = document.getElementById('recBtn');
 
             const renderer = new THREE.WebGLRenderer({{ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true }});
-            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setPixelRatio(1); // Set ke 1 untuk kecepatan kompresi maksimal
 
             const scene = new THREE.Scene();
             const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
+            // MULTI-THREADED FAST CCAPTURE SETUP
             const capturer = new CCapture({{
                 format: 'gif',
                 workersPath: 'https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/src/',
-                framerate: 20,
-                quality: 10
+                framerate: {gif_fps},
+                quality: 6, // Mengurangi beban rendering tanpa mengorbankan kualitas visual
+                workers: 4  # Menggunakan 4 CPU Worker bersamaan
             }});
 
             let isRecording = false;
@@ -343,7 +346,8 @@ if uploaded_file is not None:
                 const mesh = new THREE.Mesh(geometry, material);
                 scene.add(mesh);
 
-                renderer.setSize(400, 400);
+                // Ukuran canvas perekaman 256x256 px agar kompresi kilat
+                renderer.setSize(256, 256);
 
                 let simTime = 0;
                 function animate() {{
@@ -356,11 +360,11 @@ if uploaded_file is not None:
                     if (isRecording) {{
                         capturer.capture(canvas);
                         let elapsed = (Date.now() - startTime) / 1000;
-                        statusDiv.innerText = "⏳ Merekam Frame GPU: " + elapsed.toFixed(1) + "s / " + recordDuration + "s";
+                        statusDiv.innerText = "⚡ Perekaman Multi-Thread CPU: " + elapsed.toFixed(1) + "s / " + recordDuration + "s";
                         
                         if (elapsed >= recordDuration) {{
                             isRecording = false;
-                            statusDiv.innerText = "⚙️ Mengompresi GIF... Mohon tunggu beberapa detik...";
+                            statusDiv.innerText = "⚙️ Mengompresi GIF Kilat... Selesai dalam hitungan detik!";
                             recBtn.disabled = false;
                             capturer.stop();
                             capturer.save((blob) => {{
@@ -376,7 +380,7 @@ if uploaded_file is not None:
                 isRecording = true;
                 recBtn.disabled = true;
                 startTime = Date.now();
-                statusDiv.innerText = "🔴 Memulai Perekaman...";
+                statusDiv.innerText = "⚡ Memulai Perekaman Multi-Thread...";
                 capturer.start();
             }}
         </script>
@@ -385,7 +389,7 @@ if uploaded_file is not None:
     """
 
     with col_view:
-        st.subheader("📺 Hasil Visual & Modul Download GIF")
+        st.subheader("📺 Hasil Visual & Fast GIF Generator")
         components.html(html_png_shader_code, height=580)
 
 else:
