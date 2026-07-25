@@ -1,30 +1,17 @@
-# Install library yang dibutuhkan
-!pip install pillow imageio numpy ipywidgets -q
-
 import io
 import math
 import numpy as np
 from PIL import Image
 import imageio
-import ipywidgets as widgets
-from IPython.display import display, HTML, clear_output
-from google.colab import files
+import streamlit as st
 
-print("✅ Library berhasil di-install!")
-print("👇 Upload file PNG transparan kamu di bawah ini:")
+st.set_page_config(page_title="Dual Shader Master Studio", layout="wide")
 
-# Upload File PNG
-uploaded = files.upload()
-if uploaded:
-    filename = list(uploaded.keys())[0]
-    base_img = Image.open(filename).convert("RGBA")
-    img_np = np.array(base_img)
-    print(f"\n🖼️ Gambar '{filename}' ({base_img.width}x{base_img.height} px) berhasil dimuat!")
-else:
-    raise Exception("⚠️ Harap unggah file PNG terlebih dahulu!")
+st.title("⚔️ Dual PNG Shader Master Studio v4.0")
+st.caption("Unggah gambar PNG transparan, gabungkan **2 FX Shader sekaligus**, dan unduh GIF animasi langsung dari server!")
 
 # ==========================================
-# SHADER ENGINE (SINGLE & DUAL BLENDING)
+# 1. HELPER & SHADER CORE ENGINE (PYTHON NUMPY)
 # ==========================================
 def apply_single_shader(img_np, t, fx_type, speed, intensity, scale, hex_color):
     h, w, _ = img_np.shape
@@ -102,7 +89,7 @@ def apply_single_shader(img_np, t, fx_type, speed, intensity, scale, hex_color):
 def process_dual_shader_frame(img_array, t, 
                                fx1, speed1, int1, scale1, col1,
                                fx2, speed2, int2, scale2, col2,
-                               blend_mode="Additive", blend_ratio=0.5):
+                               blend_mode="Additive (Penjumlahan Glow)", blend_ratio=0.5):
     f1 = apply_single_shader(img_array, t, fx1, speed1, int1, scale1, col1)
     f2 = apply_single_shader(img_array, t, fx2, speed2, int2, scale2, col2)
     
@@ -124,7 +111,7 @@ def process_dual_shader_frame(img_array, t,
     return np.dstack((out_rgb, alpha.squeeze(-1)))
 
 # ==========================================
-# INTERACTIVE UI WIDGETS
+# 2. STREAMLIT SIDEBAR CONTROLS
 # ==========================================
 fx_options = [
     '🔥 Inner Lava / Magma Flow FX', '⚡ Sci-Fi Hologram FX', '🛡️ Outer Energy Shield FX',
@@ -133,79 +120,89 @@ fx_options = [
     '✨ Celestial Golden Shimmer FX'
 ]
 
-# Shader 1 Widgets
-st_fx1 = widgets.Dropdown(options=fx_options, value=fx_options[0], description='Shader 1:')
-st_color1 = widgets.ColorPicker(value='#FF3300', description='Warna 1:')
-st_int1 = widgets.FloatSlider(value=1.8, min=0.0, max=4.0, step=0.1, description='Intensitas 1:')
-st_speed1 = widgets.FloatSlider(value=1.2, min=0.1, max=5.0, step=0.1, description='Speed 1:')
-st_scale1 = widgets.FloatSlider(value=12.0, min=1.0, max=30.0, step=0.5, description='Skala 1:')
+st.sidebar.header("📁 1. Input Gambar")
+uploaded_file = st.sidebar.file_uploader("Upload PNG Transparan:", type=["png"])
 
-# Shader 2 Widgets
-st_fx2 = widgets.Dropdown(options=fx_options, value=fx_options[1], description='Shader 2:')
-st_color2 = widgets.ColorPicker(value='#00FFFF', description='Warna 2:')
-st_int2 = widgets.FloatSlider(value=1.5, min=0.0, max=4.0, step=0.1, description='Intensitas 2:')
-st_speed2 = widgets.FloatSlider(value=2.0, min=0.1, max=5.0, step=0.1, description='Speed 2:')
-st_scale2 = widgets.FloatSlider(value=20.0, min=1.0, max=30.0, step=0.5, description='Skala 2:')
+if uploaded_file is not None:
+    base_img = Image.open(uploaded_file).convert("RGBA")
+    img_np = np.array(base_img)
 
-# Blending Controls
-st_blend_mode = widgets.Dropdown(
-    options=['Additive (Penjumlahan Glow)', 'Mix / Interpolate (Campur Rasio)', 'Screen (Cahaya Terang)'],
-    value='Additive (Penjumlahan Glow)', description='Blend Mode:'
-)
-st_blend_ratio = widgets.FloatSlider(value=0.5, min=0.0, max=1.0, step=0.05, description='Rasio Mix:')
+    st.sidebar.markdown("---")
+    st.sidebar.header("🔴 2. SHADER 1")
+    fx1 = st.sidebar.selectbox("Efek Shader 1:", fx_options, index=0)
+    col1 = st.sidebar.color_picker("Warna Utama 1:", "#FF3300")
+    int1 = st.sidebar.slider("Intensitas Glow 1:", 0.0, 4.0, 1.8, 0.1)
+    speed1 = st.sidebar.slider("Kecepatan 1:", 0.1, 5.0, 1.2, 0.1)
+    scale1 = st.sidebar.slider("Skala Detail 1:", 1.0, 30.0, 12.0, 0.5)
 
-# Export Controls
-st_duration = widgets.IntSlider(value=2, min=1, max=5, step=1, description='Durasi (s):')
-st_fps = widgets.SelectionSlider(options=[10, 12, 15, 20, 25], value=15, description='FPS:')
+    st.sidebar.markdown("---")
+    st.sidebar.header("🔵 3. SHADER 2")
+    fx2 = st.sidebar.selectbox("Efek Shader 2:", fx_options, index=1)
+    col2 = st.sidebar.color_picker("Warna Utama 2:", "#00FFFF")
+    int2 = st.sidebar.slider("Intensitas Glow 2:", 0.0, 4.0, 1.5, 0.1)
+    speed2 = st.sidebar.slider("Kecepatan 2:", 0.1, 5.0, 2.0, 0.1)
+    scale2 = st.sidebar.slider("Skala Detail 2:", 1.0, 30.0, 20.0, 0.5)
 
-btn_render = widgets.Button(description='⚡ Render Dual Shader GIF', button_style='success', icon='download')
-preview_output = widgets.Output()
+    st.sidebar.markdown("---")
+    st.sidebar.header("🔀 4. BLENDING MODES")
+    blend_mode = st.sidebar.selectbox("Mode Penggabungan:", ["Additive (Penjumlahan Glow)", "Mix / Interpolate (Campur Rasio)", "Screen (Cahaya Terang)"])
+    blend_ratio = st.sidebar.slider("Rasio Pencampuran (Jika Mix Mode):", 0.0, 1.0, 0.5, 0.05)
 
-def update_preview(*args):
-    with preview_output:
-        clear_output(wait=True)
-        sample_frame = process_dual_shader_frame(
+    st.sidebar.markdown("---")
+    st.sidebar.header("🎬 5. EXPORT GIF")
+    gif_duration = st.sidebar.slider("Durasi GIF (Detik):", 1, 5, 2)
+    gif_fps = st.sidebar.select_slider("Frame Rate (FPS):", options=[10, 12, 15, 20, 25], value=15)
+
+    # ==========================================
+    # 3. MAIN DASHBOARD VIEW
+    # ==========================================
+    col_v1, col_v2 = st.columns([1, 1])
+
+    with col_v1:
+        st.subheader("👁️ Live Frame Preview")
+        # Render 1 Frame Cuplikan
+        preview_frame = process_dual_shader_frame(
             img_np, t=0.5,
-            fx1=st_fx1.value, speed1=st_speed1.value, int1=st_int1.value, scale1=st_scale1.value, col1=st_color1.value,
-            fx2=st_fx2.value, speed2=st_speed2.value, int2=st_int2.value, scale2=st_scale2.value, col2=st_color2.value,
-            blend_mode=st_blend_mode.value, blend_ratio=st_blend_ratio.value
+            fx1=fx1, speed1=speed1, int1=int1, scale1=scale1, col1=col1,
+            fx2=fx2, speed2=speed2, int2=int2, scale2=scale2, col2=col2,
+            blend_mode=blend_mode, blend_ratio=blend_ratio
         )
-        img_preview = Image.fromarray(sample_frame)
-        buf = io.BytesIO()
-        img_preview.save(buf, format='PNG')
-        display(HTML("<h4>👁️ Live Dual-Shader Preview:</h4>"))
-        display(Image.open(buf))
+        st.image(preview_frame, use_container_width=True)
 
-for w in [st_fx1, st_color1, st_int1, st_speed1, st_scale1,
-          st_fx2, st_color2, st_int2, st_speed2, st_scale2,
-          st_blend_mode, st_blend_ratio]:
-    w.observe(update_preview, 'value')
+    with col_v2:
+        st.subheader("🚀 Export Dual Shader GIF")
+        st.write("Klik tombol di bawah ini untuk merender animasi secara langsung di server!")
+        
+        if st.button("🎬 Render & Buat GIF Sekarang", use_container_width=True):
+            with st.spinner("⚙️ Sedang memproses semua frame animasi... Mohon tunggu sebentar."):
+                total_frames = gif_duration * gif_fps
+                frames = []
+                
+                for i in range(total_frames):
+                    t = (i / float(total_frames)) * 2.0 * math.pi
+                    frame = process_dual_shader_frame(
+                        img_np, t=t,
+                        fx1=fx1, speed1=speed1, int1=int1, scale1=scale1, col1=col1,
+                        fx2=fx2, speed2=speed2, int2=int2, scale2=scale2, col2=col2,
+                        blend_mode=blend_mode, blend_ratio=blend_ratio
+                    )
+                    frames.append(frame)
 
-def on_render_click(b):
-    with preview_output:
-        print("\n⚙️ Rendering Dual-Shader GIF...")
-        total_frames = st_duration.value * st_fps.value
-        frames = []
-        for i in range(total_frames):
-            t = (i / float(total_frames)) * 2.0 * math.pi
-            f = process_dual_shader_frame(
-                img_np, t=t,
-                fx1=st_fx1.value, speed1=st_speed1.value, int1=st_int1.value, scale1=st_scale1.value, col1=st_color1.value,
-                fx2=st_fx2.value, speed2=st_speed2.value, int2=st_int2.value, scale2=st_scale2.value, col2=st_color2.value,
-                blend_mode=st_blend_mode.value, blend_ratio=st_blend_ratio.value
-            )
-            frames.append(f)
+                # Simpan GIF ke RAM buffer
+                gif_buffer = io.BytesIO()
+                imageio.mimsave(gif_buffer, frames, format="GIF", fps=gif_fps, loop=0)
+                gif_bytes = gif_buffer.getvalue()
+
+            st.success("✅ Rendering selesai!")
+            st.image(gif_bytes, caption="GIF Hasil Export", use_container_width=True)
             
-        out_filename = "Dual_Shader_Combined.gif"
-        imageio.mimsave(out_filename, frames, fps=st_fps.value, loop=0)
-        print(f"✅ Selesai! Mengunduh {out_filename}...")
-        files.download(out_filename)
+            st.download_button(
+                label="💾 Download Dual Shader GIF",
+                data=gif_bytes,
+                file_name="Terraria_Dual_Shader.gif",
+                mime="image/gif",
+                use_container_width=True
+            )
 
-btn_render.on_click(on_render_click)
-
-panel_s1 = widgets.VBox([widgets.HTML("<b>🔴 SHADER 1:</b>"), st_fx1, st_color1, st_int1, st_speed1, st_scale1])
-panel_s2 = widgets.VBox([widgets.HTML("<b>🔵 SHADER 2:</b>"), st_fx2, st_color2, st_int2, st_speed2, st_scale2])
-panel_blend = widgets.VBox([widgets.HTML("<hr><b>🔀 BLENDING & EXPORT:</b>"), st_blend_mode, st_blend_ratio, st_duration, st_fps, widgets.HTML("<br>"), btn_render])
-
-display(widgets.HBox([widgets.VBox([panel_s1, panel_s2, panel_blend]), preview_output]))
-update_preview()
+else:
+    st.info("👈 Silakan unggah gambar PNG transparan di menu Sidebar sebelah kiri untuk memulai studio!")
