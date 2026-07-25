@@ -4,10 +4,10 @@ from PIL import Image
 import io
 import base64
 
-st.set_page_config(page_title="2D PNG Dual Shader Studio v3.5 Pro", layout="wide")
+st.set_page_config(page_title="2D PNG Dual Shader & Sprite Sheet Studio v3.6 Pro", layout="wide")
 
-st.title("🖼️ Custom PNG Sprite Dual .FX Shader Studio v3.5")
-st.caption("Unggah gambar PNG transparan, gabungkan **2 FX Shader**, lalu unduh animasi sebagai **GIF** atau **Sprite Sheet PNG**!")
+st.title("🖼️ Custom PNG Sprite Dual .FX Shader & Sprite Sheet Studio v3.6")
+st.caption("Unggah gambar PNG transparan, gabungkan **2 FX Shader**, kustomisasi layout **Sprite Sheet**, dan unduh hasilnya secara instan!")
 
 # ==========================================
 # 1. INPUT FILE & DUAL SHADER CONTROLS
@@ -56,10 +56,24 @@ with col_ctrl:
     blend_ratio_val = st.slider("Rasio Campuran (Khusus Mode Mix)", 0.0, 1.0, 0.5, 0.05)
 
     st.markdown("---")
-    st.subheader("🎬 5. Pengaturan Export Animasi")
-    gif_duration = st.slider("Durasi Rekaman GIF / Sheet (Detik):", 1, 5, 2)
-    gif_fps = st.select_slider("Frame Rate (FPS):", options=[10, 12, 15, 20], value=15)
-    sheet_cols = st.slider("Jumlah Kolom Sprite Sheet:", 2, 8, 4)
+    st.subheader("🎬 5. Pengaturan Durasi & FPS Animasi")
+    gif_duration = st.slider("Durasi Rekaman (Detik):", 1, 5, 2)
+    gif_fps = st.select_slider("Frame Rate (FPS):", options=[10, 12, 15, 20, 24, 30], value=15)
+
+    st.markdown("---")
+    st.subheader("🖼️ 6. Pengaturan Layout Sprite Sheet")
+    sheet_cols = st.slider("Jumlah Kolom Grid (Columns):", 1, 10, 4)
+    frame_resolution = st.select_slider(
+        "Ukuran Per Frame (Px):", 
+        options=[64, 128, 256, 320], 
+        value=256,
+        help="Semakin kecil resolusi, semakin pas untuk game pixel art seperti Terraria."
+    )
+    sprite_padding = st.slider("Jarak Antar Sprite (Padding Px):", 0, 20, 2)
+    bg_style = st.selectbox(
+        "Latar Belakang Sprite Sheet:",
+        ["Transparan (PNG Alpha)", "Hitam Pekat (#000000)", "Green Screen (#00FF00)"]
+    )
 
 # Convert Colors HEX to RGB (0.0 - 1.0)
 def hex_to_rgb_norm(hex_str):
@@ -70,6 +84,8 @@ r1, g1, b1 = hex_to_rgb_norm(fx_color_1)
 r2, g2, b2 = hex_to_rgb_norm(fx_color_2)
 
 blend_mode_id = 0 if "Additive" in blend_mode_choice else (1 if "Mix" in blend_mode_choice else 2)
+
+bg_mode_id = 0 if "Transparan" in bg_style else (1 if "Hitam" in bg_style else 2)
 
 # ==========================================
 # 2. PROSES IMAGE BASE64 & DUAL GLSL SHADER ENGINE
@@ -207,7 +223,7 @@ if uploaded_file is not None:
         }
     """
 
-    # HTML / WEBGL ENGINE DENGAN OMGIF + SPRITE SHEET GENERATOR
+    # HTML / WEBGL ENGINE DENGAN ADVANCED SPRITE SHEET GENERATOR
     html_png_shader_code = f"""
     <!DOCTYPE html>
     <html>
@@ -239,7 +255,7 @@ if uploaded_file is not None:
             <canvas id="canvas"></canvas>
             <div class="btn-group">
                 <button id="recBtn" class="btn" onclick="startRecording('gif')">⚡ Download GIF ({gif_duration}s)</button>
-                <button id="sheetBtn" class="btn btn-sheet" onclick="startRecording('sheet')">🖼️ Download Sprite Sheet PNG</button>
+                <button id="sheetBtn" class="btn btn-sheet" onclick="startRecording('sheet')">🖼️ Download Custom Sprite Sheet PNG</button>
             </div>
             <div id="status">Tampilan Real-time (Pilih format unduhan di atas)</div>
         </div>
@@ -261,7 +277,13 @@ if uploaded_file is not None:
             let recordMode = 'gif';
             let recordDuration = {gif_duration};
             let fps = {gif_fps};
+            
+            // Custom Sprite Sheet Parameters
             let sheetCols = {sheet_cols};
+            let targetFrameRes = {frame_resolution};
+            let paddingPx = {sprite_padding};
+            let bgStyleMode = {bg_mode_id};
+
             let frameCount = recordDuration * fps;
             let recordedFrames = [];
             let simTime = 0;
@@ -339,8 +361,8 @@ if uploaded_file is not None:
                                 statusDiv.innerText = "⚙️ Mengompresi GIF... Mohon tunggu.";
                                 setTimeout(compileGIF, 50);
                             }} else {{
-                                statusDiv.innerText = "⚙️ Menyusun Sprite Sheet PNG...";
-                                setTimeout(compileSpriteSheet, 50);
+                                statusDiv.innerText = "⚙️ Menyusun Custom Sprite Sheet PNG...";
+                                setTimeout(compileCustomSpriteSheet, 50);
                             }}
                         }}
                     }}
@@ -392,38 +414,68 @@ if uploaded_file is not None:
                 downloadFile(new Blob([gifBuffer.subarray(0, realLen)], {{ type: 'image/gif' }}), "Terraria_Dual_Shader.gif");
             }}
 
-            function compileSpriteSheet() {{
-                const frameW = 320;
-                const frameH = 320;
+            function compileCustomSpriteSheet() {{
+                const srcW = 320;
+                const srcH = 320;
+                
+                const frameW = targetFrameRes;
+                const frameH = targetFrameRes;
                 const cols = sheetCols;
                 const rows = Math.ceil(frameCount / cols);
+                const pad = paddingPx;
+
+                const totalSheetW = (frameW + pad) * cols + pad;
+                const totalSheetH = (frameH + pad) * rows + pad;
 
                 let sheetCanvas = document.createElement('canvas');
-                sheetCanvas.width = frameW * cols;
-                sheetCanvas.height = frameH * rows;
+                sheetCanvas.width = totalSheetW;
+                sheetCanvas.height = totalSheetH;
                 let ctx = sheetCanvas.getContext('2d');
+
+                // Render Background Color
+                if (bgStyleMode === 1) {{
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(0, 0, totalSheetW, totalSheetH);
+                }} else if (bgStyleMode === 2) {{
+                    ctx.fillStyle = '#00FF00';
+                    ctx.fillRect(0, 0, totalSheetW, totalSheetH);
+                }}
+
+                // Temporary Canvas untuk Scaling Frame
+                let frameCanvas = document.createElement('canvas');
+                frameCanvas.width = srcW;
+                frameCanvas.height = srcH;
+                let frameCtx = frameCanvas.getContext('2d');
 
                 for (let f = 0; f < recordedFrames.length; f++) {{
                     let col = f % cols;
                     let row = Math.floor(f / cols);
                     let pixels = recordedFrames[f];
 
-                    let imgData = ctx.createImageData(frameW, frameH);
-                    for (let y = 0; y < frameH; y++) {{
-                        for (let x = 0; x < frameW; x++) {{
-                            let srcIdx = ((frameH - 1 - y) * frameW + x) * 4;
-                            let dstIdx = (y * frameW + x) * 4;
+                    let imgData = frameCtx.createImageData(srcW, srcH);
+                    for (let y = 0; y < srcH; y++) {{
+                        for (let x = 0; x < srcW; x++) {{
+                            let srcIdx = ((srcH - 1 - y) * srcW + x) * 4;
+                            let dstIdx = (y * srcW + x) * 4;
                             imgData.data[dstIdx] = pixels[srcIdx];
                             imgData.data[dstIdx + 1] = pixels[srcIdx + 1];
                             imgData.data[dstIdx + 2] = pixels[srcIdx + 2];
                             imgData.data[dstIdx + 3] = pixels[srcIdx + 3];
                         }}
                     }}
-                    ctx.putImageData(imgData, col * frameW, row * frameH);
+                    frameCtx.putImageData(imgData, 0, 0);
+
+                    // Posisi Paste di Sheet dengan Padding
+                    let posX = pad + col * (frameW + pad);
+                    let posY = pad + row * (frameH + pad);
+
+                    // Draw & Scale Image ke Ukuran Frame Target
+                    ctx.imageSmoothingEnabled = false; // Mempertahankan ketajaman Pixel Art
+                    ctx.drawImage(frameCanvas, 0, 0, srcW, srcH, posX, posY, frameW, frameH);
                 }}
 
                 sheetCanvas.toBlob(function(blob) {{
-                    downloadFile(blob, "Terraria_Sprite_Sheet.png");
+                    downloadFile(blob, "Terraria_Sprite_Sheet_" + frameW + "x" + frameH + ".png");
                 }}, 'image/png');
             }}
 
@@ -447,7 +499,7 @@ if uploaded_file is not None:
     """
 
     with col_view:
-        st.subheader("📺 Hasil Visual Dual Shader & Exporter")
+        st.subheader("📺 Hasil Visual Dual Shader & Sprite Sheet Studio")
         components.html(html_png_shader_code, height=520)
 
 else:
