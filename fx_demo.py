@@ -4,10 +4,10 @@ from PIL import Image
 import io
 import base64
 
-st.set_page_config(page_title="2D PNG Shader Studio & GIF Exporter", layout="wide")
+st.set_page_config(page_title="2D PNG Shader Studio v3.0", layout="wide")
 
-st.title("🖼️ Custom PNG Sprite .FX Shader & GIF Exporter")
-st.caption("Unggah gambar PNG transparan, atur efek shader real-time, dan rekam hasilnya menjadi file GIF animasi!")
+st.title("🖼️ Custom PNG Sprite .FX Shader Studio v3.0")
+st.caption("Unggah gambar PNG transparan, eksplorasi **10 FX Shader Pro**, dan rekam hasilnya menjadi GIF animasi!")
 
 # ==========================================
 # 1. INPUT FILE & SHADER CONTROLS
@@ -19,23 +19,33 @@ with col_ctrl:
     uploaded_file = st.file_uploader("Pilih File PNG Transparan:", type=["png"])
 
     st.markdown("---")
-    st.subheader("🎛️ 2. Pengaturan Shader FX")
+    st.subheader("🎛️ 2. Pengaturan Shader FX (10 Types)")
     
     fx_choice = st.selectbox(
-        "Pilih Efek Shader:",
+        "Pilih Efek Shader (.FX Effect):",
         [
             "🔥 Inner Lava / Magma Flow FX",
             "⚡ Sci-Fi Hologram & Scanlines FX",
             "🛡️ Outer Energy Shield Aura FX",
-            "🌈 Rainbow Chromatic Shift FX"
+            "🌈 Rainbow Chromatic Shift FX",
+            "❄️ Frost Glaze & Ice Crystals FX",
+            "🌌 Cosmic Nebula Swirl FX",
+            "📜 Runic Magic Energy FX",
+            "👾 Cyberpunk Digital Glitch FX",
+            "🟢 Toxic Acid / Slime Bubbles FX",
+            "✨ Celestial Golden Shimmer FX"
         ]
     )
 
-    anim_speed = st.slider("Kecepatan Animasi", 0.1, 5.0, 1.2, 0.1)
+    anim_speed = st.slider("Kecepatan Animasi Shader", 0.1, 5.0, 1.2, 0.1)
     glow_intensity = st.slider("Intensitas Cahaya (Glow Power)", 0.5, 4.0, 2.0, 0.1)
-    scale_freq = st.slider("Frekuensi Gelombang / Skala", 1.0, 30.0, 12.0, 0.5)
+    scale_freq = st.slider("Frekuensi Gelombang / Skala Detail", 1.0, 30.0, 12.0, 0.5)
     
-    fx_color = st.color_picker("Warna Utama FX Shader:", "#FF3300" if "Lava" in fx_choice else "#00FFFF")
+    fx_color = st.color_picker(
+        "Warna Utama FX Shader:", 
+        "#FF3300" if "Lava" in fx_choice or "Gold" in fx_choice else 
+        ("#00FFCC" if "Frost" in fx_choice or "Runic" in fx_choice else "#00FFFF")
+    )
 
     st.markdown("---")
     st.subheader("🎬 3. Rekam GIF")
@@ -57,7 +67,7 @@ if uploaded_file is not None:
     img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
     img_data_url = f"data:image/png;base64,{img_b64}"
 
-    # GLSL FRAGMENT SHADER LOGIC
+    # GLSL FRAGMENT SHADER ENGINE FOR 10 SHADER MODES
     if "Lava" in fx_choice:
         fragment_shader = """
             uniform sampler2D u_texture;
@@ -71,10 +81,8 @@ if uploaded_file is not None:
             void main() {
                 vec4 texColor = texture2D(u_texture, vUv);
                 if (texColor.a < 0.1) { discard; }
-
                 float noise = sin(vUv.x * u_scale + u_time * u_speed) * cos(vUv.y * u_scale + u_time * u_speed);
                 float vein = smoothstep(0.1, 0.5, abs(noise));
-                
                 vec3 magmaColor = mix(u_color * u_intensity, texColor.rgb * 0.3, vein);
                 gl_FragColor = vec4(magmaColor, texColor.a);
             }
@@ -92,10 +100,8 @@ if uploaded_file is not None:
             void main() {
                 vec4 texColor = texture2D(u_texture, vUv);
                 if (texColor.a < 0.1) { discard; }
-
                 float scanline = sin(vUv.y * u_scale - u_time * u_speed * 4.0) * 0.5 + 0.5;
                 scanline = pow(scanline, 2.0) * u_intensity;
-
                 vec3 holoColor = mix(texColor.rgb, u_color, 0.6) * (scanline + 0.5);
                 gl_FragColor = vec4(holoColor, texColor.a * (scanline * 0.5 + 0.5));
             }
@@ -114,14 +120,105 @@ if uploaded_file is not None:
                 vec4 texColor = texture2D(u_texture, vUv);
                 float pulse = sin(u_time * u_speed * 3.0) * 0.3 + 0.7;
                 vec3 auraColor = u_color * u_intensity * pulse;
-
                 if (texColor.a < 0.1) { discard; }
-
                 vec3 finalColor = mix(texColor.rgb, auraColor, 0.4);
                 gl_FragColor = vec4(finalColor, texColor.a);
             }
         """
-    else: # Rainbow
+    elif "Rainbow" in fx_choice:
+        fragment_shader = """
+            uniform sampler2D u_texture;
+            uniform float u_time;
+            uniform float u_speed;
+            uniform float u_intensity;
+            varying vec2 vUv;
+
+            void main() {
+                vec4 texColor = texture2D(u_texture, vUv);
+                if (texColor.a < 0.1) { discard; }
+                float rainbow = vUv.x + vUv.y + u_time * u_speed * 0.5;
+                vec3 rainbowColor = 0.5 + 0.5 * cos(rainbow * 6.28318 + vec3(0.0, 2.0, 4.0));
+                vec3 finalColor = mix(texColor.rgb, rainbowColor * u_intensity, 0.6);
+                gl_FragColor = vec4(finalColor, texColor.a);
+            }
+        """
+    elif "Frost" in fx_choice:
+        fragment_shader = """
+            uniform sampler2D u_texture;
+            uniform float u_time;
+            uniform float u_speed;
+            uniform float u_scale;
+            uniform float u_intensity;
+            uniform vec3 u_color;
+            varying vec2 vUv;
+
+            void main() {
+                vec4 texColor = texture2D(u_texture, vUv);
+                if (texColor.a < 0.1) { discard; }
+                float shard = abs(sin(vUv.x * u_scale + vUv.y * u_scale + u_time * u_speed));
+                vec3 iceColor = mix(texColor.rgb, u_color * u_intensity, shard * 0.7);
+                gl_FragColor = vec4(iceColor, texColor.a);
+            }
+        """
+    elif "Cosmic" in fx_choice:
+        fragment_shader = """
+            uniform sampler2D u_texture;
+            uniform float u_time;
+            uniform float u_speed;
+            uniform float u_scale;
+            uniform float u_intensity;
+            uniform vec3 u_color;
+            varying vec2 vUv;
+
+            void main() {
+                vec4 texColor = texture2D(u_texture, vUv);
+                if (texColor.a < 0.1) { discard; }
+                vec2 center = vec2(0.5, 0.5);
+                float dist = distance(vUv, center);
+                float swirl = sin(dist * u_scale - u_time * u_speed * 2.0);
+                vec3 cosmicColor = mix(u_color * u_intensity, vec3(0.1, 0.0, 0.2), swirl * 0.5 + 0.5);
+                gl_FragColor = vec4(mix(texColor.rgb, cosmicColor, 0.7), texColor.a);
+            }
+        """
+    elif "Runic" in fx_choice:
+        fragment_shader = """
+            uniform sampler2D u_texture;
+            uniform float u_time;
+            uniform float u_speed;
+            uniform float u_scale;
+            uniform float u_intensity;
+            uniform vec3 u_color;
+            varying vec2 vUv;
+
+            void main() {
+                vec4 texColor = texture2D(u_texture, vUv);
+                if (texColor.a < 0.1) { discard; }
+                float grid = step(0.85, sin(vUv.x * u_scale) * sin(vUv.y * u_scale));
+                float pulse = sin(u_time * u_speed * 3.0) * 0.5 + 0.5;
+                vec3 runeColor = mix(texColor.rgb, u_color * u_intensity, grid * pulse);
+                gl_FragColor = vec4(runeColor, texColor.a);
+            }
+        """
+    elif "Glitch" in fx_choice:
+        fragment_shader = """
+            uniform sampler2D u_texture;
+            uniform float u_time;
+            uniform float u_speed;
+            uniform float u_intensity;
+            varying vec2 vUv;
+
+            void main() {
+                vec2 uv = vUv;
+                float glitchTime = floor(u_time * u_speed * 10.0);
+                float noise = sin(uv.y * 50.0 + glitchTime) * 0.01;
+                uv.x += noise;
+                
+                vec4 texColor = texture2D(u_texture, uv);
+                if (texColor.a < 0.1) { discard; }
+                gl_FragColor = vec4(texColor.rgb * u_intensity, texColor.a);
+            }
+        """
+    elif "Toxic" in fx_choice:
         fragment_shader = """
             uniform sampler2D u_texture;
             uniform float u_time;
@@ -133,12 +230,27 @@ if uploaded_file is not None:
             void main() {
                 vec4 texColor = texture2D(u_texture, vUv);
                 if (texColor.a < 0.1) { discard; }
+                float bubbles = sin(vUv.x * u_scale) * cos(vUv.y * u_scale + u_time * u_speed * 2.0);
+                vec3 acidColor = mix(vec3(0.1, 0.9, 0.1) * u_intensity, texColor.rgb, smoothstep(0.2, 0.8, abs(bubbles)));
+                gl_FragColor = vec4(acidColor, texColor.a);
+            }
+        """
+    else: # Celestial Gold
+        fragment_shader = """
+            uniform sampler2D u_texture;
+            uniform float u_time;
+            uniform float u_speed;
+            uniform float u_scale;
+            uniform float u_intensity;
+            uniform vec3 u_color;
+            varying vec2 vUv;
 
-                float rainbow = vUv.x + vUv.y + u_time * u_speed * 0.5;
-                vec3 rainbowColor = 0.5 + 0.5 * cos(rainbow * 6.28318 + vec3(0.0, 2.0, 4.0));
-
-                vec3 finalColor = mix(texColor.rgb, rainbowColor * u_intensity, 0.6);
-                gl_FragColor = vec4(finalColor, texColor.a);
+            void main() {
+                vec4 texColor = texture2D(u_texture, vUv);
+                if (texColor.a < 0.1) { discard; }
+                float shimmer = sin((vUv.x + vUv.y) * u_scale + u_time * u_speed * 3.0) * 0.5 + 0.5;
+                vec3 goldColor = mix(texColor.rgb, u_color * u_intensity, pow(shimmer, 2.0) * 0.8);
+                gl_FragColor = vec4(goldColor, texColor.a);
             }
         """
 
@@ -169,7 +281,6 @@ if uploaded_file is not None:
             #status {{ margin-top: 10px; font-size: 13px; color: #a3f3ff; font-weight: bold; }}
         </style>
 
-        <!-- Library External Untuk Perekaman WebGL & Export GIF -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/build/CCapture.all.min.js"></script>
     </head>
@@ -193,7 +304,6 @@ if uploaded_file is not None:
             const scene = new THREE.Scene();
             const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-            // Inisialisasi Perekam GIF (CCapture)
             const capturer = new CCapture({{
                 format: 'gif',
                 workersPath: 'https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/src/',
