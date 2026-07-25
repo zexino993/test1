@@ -1,208 +1,415 @@
-import io
-import math
-import numpy as np
-from PIL import Image
-import imageio
 import streamlit as st
+import streamlit.components.v1 as components
+from PIL import Image
+import io
+import base64
 
-st.set_page_config(page_title="Dual Shader Master Studio", layout="wide")
+st.set_page_config(page_title="2D PNG Dual Shader Studio v3.4 Pro", layout="wide")
 
-st.title("⚔️ Dual PNG Shader Master Studio v4.0")
-st.caption("Unggah gambar PNG transparan, gabungkan **2 FX Shader sekaligus**, dan unduh GIF animasi langsung dari server!")
-
-# ==========================================
-# 1. HELPER & SHADER CORE ENGINE (PYTHON NUMPY)
-# ==========================================
-def apply_single_shader(img_np, t, fx_type, speed, intensity, scale, hex_color):
-    h, w, _ = img_np.shape
-    y_idx, x_idx = np.indices((h, w), dtype=np.float32)
-    uv_x = x_idx / max(1.0, w - 1.0)
-    uv_y = y_idx / max(1.0, h - 1.0)
-    
-    hex_color = hex_color.lstrip('#')
-    c_rgb = np.array([int(hex_color[i:i+2], 16) for i in (0, 2, 4)], dtype=np.float32)
-    
-    alpha = img_np[:, :, 3] / 255.0
-    orig_rgb = img_np[:, :, :3].astype(np.float32)
-    
-    if "Lava" in fx_type:
-        noise = np.sin(uv_x * scale + t * speed) * np.cos(uv_y * scale + t * speed)
-        vein = np.clip(np.abs(noise), 0.1, 0.6)
-        mask = np.expand_dims(vein * alpha, axis=-1)
-        out_rgb = orig_rgb * (1.0 - mask) + (c_rgb * intensity) * mask
-
-    elif "Hologram" in fx_type:
-        scanline = (np.sin(uv_y * scale - t * speed * 3.0) * 0.5 + 0.5)**2
-        mask = np.expand_dims(scanline * alpha, axis=-1)
-        out_rgb = orig_rgb * 0.4 + (c_rgb * intensity) * mask
-
-    elif "Shield" in fx_type:
-        pulse = (math.sin(t * speed * 2.0) * 0.3 + 0.7) * intensity
-        mask = np.expand_dims(alpha * pulse * 0.5, axis=-1)
-        out_rgb = orig_rgb + c_rgb * mask
-
-    elif "Rainbow" in fx_type:
-        rainbow_phase = uv_x + uv_y + t * speed * 0.2
-        r = (np.cos(rainbow_phase * 6.28 + 0.0) * 0.5 + 0.5) * 255.0
-        g = (np.cos(rainbow_phase * 6.28 + 2.0) * 0.5 + 0.5) * 255.0
-        b = (np.cos(rainbow_phase * 6.28 + 4.0) * 0.5 + 0.5) * 255.0
-        rainbow_rgb = np.dstack((r, g, b)) * intensity
-        mask = np.expand_dims(alpha * 0.6, axis=-1)
-        out_rgb = orig_rgb * (1.0 - mask) + rainbow_rgb * mask
-
-    elif "Frost" in fx_type:
-        shard = np.abs(np.sin(uv_x * scale + uv_y * scale + t * speed))
-        mask = np.expand_dims(shard * alpha * 0.7, axis=-1)
-        out_rgb = orig_rgb * (1.0 - mask) + (c_rgb * intensity) * mask
-
-    elif "Cosmic" in fx_type:
-        dist_c = np.sqrt((uv_x - 0.5)**2 + (uv_y - 0.5)**2)
-        swirl = np.sin(dist_c * scale - t * speed * 2.0) * 0.5 + 0.5
-        mask = np.expand_dims(swirl * alpha * 0.7, axis=-1)
-        out_rgb = orig_rgb * (1.0 - mask) + (c_rgb * intensity) * mask
-
-    elif "Runic" in fx_type:
-        grid = (np.sin(uv_x * scale) * np.sin(uv_y * scale) > 0.5).astype(np.float32)
-        pulse = (math.sin(t * speed * 3.0) * 0.5 + 0.5)
-        mask = np.expand_dims(grid * pulse * alpha, axis=-1)
-        out_rgb = orig_rgb * (1.0 - mask) + (c_rgb * intensity) * mask
-
-    elif "Glitch" in fx_type:
-        glitch_time = math.floor(t * speed * 5.0)
-        noise_shift = math.sin(uv_y[0, 0] * 50.0 + glitch_time) * 10.0
-        out_rgb = np.roll(orig_rgb, int(noise_shift), axis=1) * intensity
-
-    elif "Toxic" in fx_type:
-        bubbles = np.sin(uv_x * scale) * np.cos(uv_y * scale + t * speed * 2.0)
-        toxic_color = np.array([25.0, 230.0, 25.0], dtype=np.float32) * intensity
-        mask = np.expand_dims(np.clip(np.abs(bubbles), 0.1, 0.7) * alpha, axis=-1)
-        out_rgb = orig_rgb * (1.0 - mask) + toxic_color * mask
-
-    else: # Gold Shimmer
-        shimmer = (np.sin((uv_x + uv_y) * scale + t * speed * 3.0) * 0.5 + 0.5)**2
-        mask = np.expand_dims(shimmer * alpha * 0.8, axis=-1)
-        out_rgb = orig_rgb * (1.0 - mask) + (c_rgb * intensity) * mask
-
-    out_rgb = np.clip(out_rgb, 0, 255).astype(np.uint8)
-    return np.dstack((out_rgb, img_np[:, :, 3]))
-
-def process_dual_shader_frame(img_array, t, 
-                               fx1, speed1, int1, scale1, col1,
-                               fx2, speed2, int2, scale2, col2,
-                               blend_mode="Additive (Penjumlahan Glow)", blend_ratio=0.5):
-    f1 = apply_single_shader(img_array, t, fx1, speed1, int1, scale1, col1)
-    f2 = apply_single_shader(img_array, t, fx2, speed2, int2, scale2, col2)
-    
-    alpha = img_array[:, :, 3:4]
-    rgb1 = f1[:, :, :3].astype(np.float32)
-    rgb2 = f2[:, :, :3].astype(np.float32)
-    orig_rgb = img_array[:, :, :3].astype(np.float32)
-    
-    if blend_mode == "Additive (Penjumlahan Glow)":
-        diff1 = rgb1 - orig_rgb
-        diff2 = rgb2 - orig_rgb
-        out_rgb = orig_rgb + diff1 + diff2
-    elif blend_mode == "Mix / Interpolate (Campur Rasio)":
-        out_rgb = rgb1 * (1.0 - blend_ratio) + rgb2 * blend_ratio
-    else: # Screen
-        out_rgb = 255.0 - (255.0 - rgb1) * (255.0 - rgb2) / 255.0
-        
-    out_rgb = np.clip(out_rgb, 0, 255).astype(np.uint8)
-    return np.dstack((out_rgb, alpha.squeeze(-1)))
+st.title("🖼️ Custom PNG Sprite Dual .FX Shader Studio v3.4")
+st.caption("Unggah gambar PNG transparan, gabungkan **2 FX Shader sekaligus** secara real-time, dan rekam GIF!")
 
 # ==========================================
-# 2. STREAMLIT SIDEBAR CONTROLS
+# 1. INPUT FILE & DUAL SHADER CONTROLS
 # ==========================================
+col_ctrl, col_view = st.columns([1, 2])
+
 fx_options = [
-    '🔥 Inner Lava / Magma Flow FX', '⚡ Sci-Fi Hologram FX', '🛡️ Outer Energy Shield FX',
-    '🌈 Rainbow Chromatic FX', '❄️ Frost Glaze & Ice FX', '🌌 Cosmic Nebula Swirl FX',
-    '📜 Runic Magic Energy FX', '👾 Cyberpunk Digital Glitch FX', '🟢 Toxic Acid / Slime FX',
-    '✨ Celestial Golden Shimmer FX'
+    "🔥 Inner Lava / Magma Flow FX",
+    "⚡ Sci-Fi Hologram & Scanlines FX",
+    "🛡️ Outer Energy Shield Aura FX",
+    "🌈 Rainbow Chromatic Shift FX",
+    "❄️ Frost Glaze & Ice Crystals FX",
+    "🌌 Cosmic Nebula Swirl FX",
+    "📜 Runic Magic Energy FX",
+    "👾 Cyberpunk Digital Glitch FX",
+    "🟢 Toxic Acid / Slime Bubbles FX",
+    "✨ Celestial Golden Shimmer FX"
 ]
 
-st.sidebar.header("📁 1. Input Gambar")
-uploaded_file = st.sidebar.file_uploader("Upload PNG Transparan:", type=["png"])
+with col_ctrl:
+    st.subheader("📁 1. Input Gambar PNG")
+    uploaded_file = st.file_uploader("Pilih File PNG Transparan:", type=["png"])
 
+    st.markdown("---")
+    st.subheader("🔴 2. Pengaturan Shader 1")
+    fx_choice_1 = st.selectbox("Pilih Shader 1:", fx_options, index=0)
+    anim_speed_1 = st.slider("Kecepatan Shader 1", 0.1, 5.0, 1.2, 0.1, key="spd1")
+    glow_intensity_1 = st.slider("Intensitas Cahaya (Glow Power 1)", 0.0, 4.0, 1.8, 0.1, key="int1")
+    scale_freq_1 = st.slider("Frekuensi / Skala Detail 1", 1.0, 30.0, 12.0, 0.5, key="scl1")
+    fx_color_1 = st.color_picker("Warna Utama Shader 1:", "#FF3300", key="col1")
+
+    st.markdown("---")
+    st.subheader("🔵 3. Pengaturan Shader 2")
+    fx_choice_2 = st.selectbox("Pilih Shader 2:", fx_options, index=1)
+    anim_speed_2 = st.slider("Kecepatan Shader 2", 0.1, 5.0, 2.0, 0.1, key="spd2")
+    glow_intensity_2 = st.slider("Intensitas Cahaya (Glow Power 2)", 0.0, 4.0, 1.5, 0.1, key="int2")
+    scale_freq_2 = st.slider("Frekuensi / Skala Detail 2", 1.0, 30.0, 20.0, 0.5, key="scl2")
+    fx_color_2 = st.color_picker("Warna Utama Shader 2:", "#00FFFF", key="col2")
+
+    st.markdown("---")
+    st.subheader("🔀 4. Mode Penggabungan (Blending)")
+    blend_mode_choice = st.selectbox(
+        "Mode Blending Dual Shader:",
+        ["Additive (Penjumlahan Glow)", "Mix / Interpolate (Campur Rasio)", "Screen (Cahaya Terang)"]
+    )
+    blend_ratio_val = st.slider("Rasio Campuran (Khusus Mode Mix)", 0.0, 1.0, 0.5, 0.05)
+
+    st.markdown("---")
+    st.subheader("🎬 5. Rekam GIF Fast")
+    gif_duration = st.slider("Durasi Rekaman GIF (Detik):", 1, 5, 2)
+    gif_fps = st.select_slider("Frame Rate (FPS):", options=[10, 12, 15, 20], value=15)
+
+# Convert Colors HEX to RGB (0.0 - 1.0)
+def hex_to_rgb_norm(hex_str):
+    c = hex_str.lstrip('#')
+    return int(c[0:2], 16) / 255.0, int(c[2:4], 16) / 255.0, int(c[4:6], 16) / 255.0
+
+r1, g1, b1 = hex_to_rgb_norm(fx_color_1)
+r2, g2, b2 = hex_to_rgb_norm(fx_color_2)
+
+# Map Blending Mode
+blend_mode_id = 0 if "Additive" in blend_mode_choice else (1 if "Mix" in blend_mode_choice else 2)
+
+# ==========================================
+# 2. PROSES IMAGE BASE64 & DUAL GLSL SHADER ENGINE
+# ==========================================
 if uploaded_file is not None:
-    base_img = Image.open(uploaded_file).convert("RGBA")
-    img_np = np.array(base_img)
+    input_image = Image.open(uploaded_file).convert("RGBA")
+    buffered = io.BytesIO()
+    input_image.save(buffered, format="PNG")
+    img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    img_data_url = f"data:image/png;base64,{img_b64}"
 
-    st.sidebar.markdown("---")
-    st.sidebar.header("🔴 2. SHADER 1")
-    fx1 = st.sidebar.selectbox("Efek Shader 1:", fx_options, index=0)
-    col1 = st.sidebar.color_picker("Warna Utama 1:", "#FF3300")
-    int1 = st.sidebar.slider("Intensitas Glow 1:", 0.0, 4.0, 1.8, 0.1)
-    speed1 = st.sidebar.slider("Kecepatan 1:", 0.1, 5.0, 1.2, 0.1)
-    scale1 = st.sidebar.slider("Skala Detail 1:", 1.0, 30.0, 12.0, 0.5)
+    # GLSL COMPACT HELPER FUNCTIONS FOR SHADERS
+    glsl_helpers = """
+        vec3 getLava(vec2 uv, float t, float spd, float scl, float intns, vec3 col, vec3 orig) {
+            float noise = sin(uv.x * scl + t * spd) * cos(uv.y * scl + t * spd);
+            float vein = smoothstep(0.1, 0.5, abs(noise));
+            return mix(col * intns, orig * 0.3, vein);
+        }
+        vec3 getHologram(vec2 uv, float t, float spd, float scl, float intns, vec3 col, vec3 orig) {
+            float scanline = sin(uv.y * scl - t * spd * 4.0) * 0.5 + 0.5;
+            scanline = pow(scanline, 2.0) * intns;
+            return mix(orig, col, 0.6) * (scanline + 0.5);
+        }
+        vec3 getShield(vec2 uv, float t, float spd, float scl, float intns, vec3 col, vec3 orig) {
+            float pulse = sin(t * spd * 3.0) * 0.3 + 0.7;
+            vec3 auraColor = col * intns * pulse;
+            return mix(orig, auraColor, 0.4);
+        }
+        vec3 getRainbow(vec2 uv, float t, float spd, float intns, vec3 orig) {
+            float rainbow = uv.x + uv.y + t * spd * 0.5;
+            vec3 rainbowColor = 0.5 + 0.5 * cos(rainbow * 6.28318 + vec3(0.0, 2.0, 4.0));
+            return mix(orig, rainbowColor * intns, 0.6);
+        }
+        vec3 getFrost(vec2 uv, float t, float spd, float scl, float intns, vec3 col, vec3 orig) {
+            float shard = abs(sin(uv.x * scl + uv.y * scl + t * spd));
+            return mix(orig, col * intns, shard * 0.7);
+        }
+        vec3 getCosmic(vec2 uv, float t, float spd, float scl, float intns, vec3 col, vec3 orig) {
+            float dist = distance(uv, vec2(0.5, 0.5));
+            float swirl = sin(dist * scl - t * spd * 2.0);
+            vec3 cosmicColor = mix(col * intns, vec3(0.1, 0.0, 0.2), swirl * 0.5 + 0.5);
+            return mix(orig, cosmicColor, 0.7);
+        }
+        vec3 getRunic(vec2 uv, float t, float spd, float scl, float intns, vec3 col, vec3 orig) {
+            float grid = step(0.85, sin(uv.x * scl) * sin(uv.y * scl));
+            float pulse = sin(t * spd * 3.0) * 0.5 + 0.5;
+            return mix(orig, col * intns, grid * pulse);
+        }
+        vec3 getGlitch(vec2 uv, float t, float spd, float intns, sampler2D tex) {
+            float glitchTime = floor(t * spd * 10.0);
+            float noise = sin(uv.y * 50.0 + glitchTime) * 0.01;
+            return texture2D(tex, vec2(uv.x + noise, uv.y)).rgb * intns;
+        }
+        vec3 getToxic(vec2 uv, float t, float spd, float scl, float intns, vec3 orig) {
+            float bubbles = sin(uv.x * scl) * cos(uv.y * scl + t * spd * 2.0);
+            return mix(vec3(0.1, 0.9, 0.1) * intns, orig, smoothstep(0.2, 0.8, abs(bubbles)));
+        }
+        vec3 getGold(vec2 uv, float t, float spd, float scl, float intns, vec3 col, vec3 orig) {
+            float shimmer = sin((uv.x + uv.y) * scl + t * spd * 3.0) * 0.5 + 0.5;
+            return mix(orig, col * intns, pow(shimmer, 2.0) * 0.8);
+        }
 
-    st.sidebar.markdown("---")
-    st.sidebar.header("🔵 3. SHADER 2")
-    fx2 = st.sidebar.selectbox("Efek Shader 2:", fx_options, index=1)
-    col2 = st.sidebar.color_picker("Warna Utama 2:", "#00FFFF")
-    int2 = st.sidebar.slider("Intensitas Glow 2:", 0.0, 4.0, 1.5, 0.1)
-    speed2 = st.sidebar.slider("Kecepatan 2:", 0.1, 5.0, 2.0, 0.1)
-    scale2 = st.sidebar.slider("Skala Detail 2:", 1.0, 30.0, 20.0, 0.5)
+        vec3 computeShader(int type, vec2 uv, float t, float spd, float scl, float intns, vec3 col, vec3 orig, sampler2D tex) {
+            if (type == 0) return getLava(uv, t, spd, scl, intns, col, orig);
+            if (type == 1) return getHologram(uv, t, spd, scl, intns, col, orig);
+            if (type == 2) return getShield(uv, t, spd, scl, intns, col, orig);
+            if (type == 3) return getRainbow(uv, t, spd, intns, orig);
+            if (type == 4) return getFrost(uv, t, spd, scl, intns, col, orig);
+            if (type == 5) return getCosmic(uv, t, spd, scl, intns, col, orig);
+            if (type == 6) return getRunic(uv, t, spd, scl, intns, col, orig);
+            if (type == 7) return getGlitch(uv, t, spd, intns, tex);
+            if (type == 8) return getToxic(uv, t, spd, scl, intns, orig);
+            return getGold(uv, t, spd, scl, intns, col, orig);
+        }
+    """
 
-    st.sidebar.markdown("---")
-    st.sidebar.header("🔀 4. BLENDING MODES")
-    blend_mode = st.sidebar.selectbox("Mode Penggabungan:", ["Additive (Penjumlahan Glow)", "Mix / Interpolate (Campur Rasio)", "Screen (Cahaya Terang)"])
-    blend_ratio = st.sidebar.slider("Rasio Pencampuran (Jika Mix Mode):", 0.0, 1.0, 0.5, 0.05)
+    def get_fx_id(fx_name):
+        return fx_options.index(fx_name)
 
-    st.sidebar.markdown("---")
-    st.sidebar.header("🎬 5. EXPORT GIF")
-    gif_duration = st.sidebar.slider("Durasi GIF (Detik):", 1, 5, 2)
-    gif_fps = st.sidebar.select_slider("Frame Rate (FPS):", options=[10, 12, 15, 20, 25], value=15)
+    fx_id_1 = get_fx_id(fx_choice_1)
+    fx_id_2 = get_fx_id(fx_choice_2)
 
-    # ==========================================
-    # 3. MAIN DASHBOARD VIEW
-    # ==========================================
-    col_v1, col_v2 = st.columns([1, 1])
-
-    with col_v1:
-        st.subheader("👁️ Live Frame Preview")
-        # Render 1 Frame Cuplikan
-        preview_frame = process_dual_shader_frame(
-            img_np, t=0.5,
-            fx1=fx1, speed1=speed1, int1=int1, scale1=scale1, col1=col1,
-            fx2=fx2, speed2=speed2, int2=int2, scale2=scale2, col2=col2,
-            blend_mode=blend_mode, blend_ratio=blend_ratio
-        )
-        st.image(preview_frame, use_container_width=True)
-
-    with col_v2:
-        st.subheader("🚀 Export Dual Shader GIF")
-        st.write("Klik tombol di bawah ini untuk merender animasi secara langsung di server!")
+    fragment_shader = f"""
+        uniform sampler2D u_texture;
+        uniform float u_time;
         
-        if st.button("🎬 Render & Buat GIF Sekarang", use_container_width=True):
-            with st.spinner("⚙️ Sedang memproses semua frame animasi... Mohon tunggu sebentar."):
-                total_frames = gif_duration * gif_fps
-                frames = []
+        uniform int u_type1;
+        uniform float u_speed1;
+        uniform float u_scale1;
+        uniform float u_intensity1;
+        uniform vec3 u_color1;
+
+        uniform int u_type2;
+        uniform float u_speed2;
+        uniform float u_scale2;
+        uniform float u_intensity2;
+        uniform vec3 u_color2;
+
+        uniform int u_blendMode;
+        uniform float u_blendRatio;
+
+        varying vec2 vUv;
+
+        {glsl_helpers}
+
+        void main() {{
+            vec4 texColor = texture2D(u_texture, vUv);
+            if (texColor.a < 0.1) {{ discard; }}
+
+            vec3 origRgb = texColor.rgb;
+
+            vec3 rgb1 = computeShader(u_type1, vUv, u_time, u_speed1, u_scale1, u_intensity1, u_color1, origRgb, u_texture);
+            vec3 rgb2 = computeShader(u_type2, vUv, u_time, u_speed2, u_scale2, u_intensity2, u_color2, origRgb, u_texture);
+
+            vec3 finalRgb = origRgb;
+
+            if (u_blendMode == 0) {{ // Additive
+                vec3 diff1 = rgb1 - origRgb;
+                vec3 diff2 = rgb2 - origRgb;
+                finalRgb = origRgb + diff1 + diff2;
+            }} else if (u_blendMode == 1) {{ // Mix
+                finalRgb = mix(rgb1, rgb2, u_blendRatio);
+            }} else {{ // Screen
+                finalRgb = 1.0 - (1.0 - rgb1) * (1.0 - rgb2);
+            }}
+
+            gl_FragColor = vec4(clamp(finalRgb, 0.0, 1.0), texColor.a);
+        }}
+    """
+
+    vertex_shader = """
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    """
+
+    # HTML / WEBGL DUAL SHADER ENGINE DENGAN OMGIF EXPORTER
+    html_png_shader_code = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ margin: 0; overflow: hidden; background: #0b0712; font-family: sans-serif; text-align: center; color: white; }}
+            #container {{ display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }}
+            canvas {{ width: 320px; height: 320px; display: block; image-rendering: pixelated; margin-bottom: 12px; border: 1px solid #3a1c5d; border-radius: 8px; background: #110822; }}
+            .btn {{
+                background: linear-gradient(135deg, #8a2be2, #4b0082);
+                color: white; border: 1px solid #d4a5ff; border-radius: 8px;
+                padding: 10px 20px; font-weight: bold; cursor: pointer; font-size: 14px;
+                transition: all 0.3s ease;
+            }}
+            .btn:hover {{ background: linear-gradient(135deg, #a34bfb, #6a0ded); box-shadow: 0 0 12px rgba(163, 75, 251, 0.6); }}
+            #status {{ margin-top: 10px; font-size: 13px; color: #a3f3ff; font-weight: bold; }}
+        </style>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/omggif@1.0.10/omggif.min.js"></script>
+    </head>
+    <body>
+        <div id="container">
+            <canvas id="canvas"></canvas>
+            <div>
+                <button id="recBtn" class="btn" onclick="startRecording()">⚡ Rekam & Buat Fast GIF ({gif_duration}s @ {gif_fps}fps)</button>
+            </div>
+            <div id="status">Tampilan Real-time (Klik tombol di atas untuk mengunduh GIF)</div>
+        </div>
+
+        <script>
+            const canvas = document.getElementById('canvas');
+            const statusDiv = document.getElementById('status');
+            const recBtn = document.getElementById('recBtn');
+
+            const renderer = new THREE.WebGLRenderer({{ canvas: canvas, antialias: true, alpha: true, preserveDrawingBuffer: true }});
+            renderer.setSize(320, 320);
+            renderer.setPixelRatio(1);
+
+            const scene = new THREE.Scene();
+            const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+            let isRecording = false;
+            let recordDuration = {gif_duration};
+            let fps = {gif_fps};
+            let frameCount = recordDuration * fps;
+            let recordedFrames = [];
+            let simTime = 0;
+
+            const loader = new THREE.TextureLoader();
+            loader.load('{img_data_url}', function(texture) {{
+                texture.minFilter = THREE.NearestFilter;
+                texture.magFilter = THREE.NearestFilter;
+
+                const aspect = texture.image.width / texture.image.height;
+                const geometry = new THREE.PlaneGeometry(aspect >= 1 ? 1.6 : 1.6 * aspect, aspect >= 1 ? 1.6 / aspect : 1.6);
+
+                const uniforms = {{
+                    u_texture: {{ value: texture }},
+                    u_time: {{ value: 0.0 }},
+                    
+                    u_type1: {{ value: {fx_id_1} }},
+                    u_speed1: {{ value: {anim_speed_1} }},
+                    u_scale1: {{ value: {scale_freq_1} }},
+                    u_intensity1: {{ value: {glow_intensity_1} }},
+                    u_color1: {{ value: new THREE.Color({r1}, {g1}, {b1}) }},
+
+                    u_type2: {{ value: {fx_id_2} }},
+                    u_speed2: {{ value: {anim_speed_2} }},
+                    u_scale2: {{ value: {scale_freq_2} }},
+                    u_intensity2: {{ value: {glow_intensity_2} }},
+                    u_color2: {{ value: new THREE.Color({r2}, {g2}, {b2}) }},
+
+                    u_blendMode: {{ value: {blend_mode_id} }},
+                    u_blendRatio: {{ value: {blend_ratio_val} }}
+                }};
+
+                const material = new THREE.ShaderMaterial({{
+                    vertexShader: `{vertex_shader}`,
+                    fragmentShader: `{fragment_shader}`,
+                    uniforms: uniforms,
+                    transparent: true,
+                    side: THREE.DoubleSide
+                }});
+
+                const mesh = new THREE.Mesh(geometry, material);
+                scene.add(mesh);
+
+                function animate() {{
+                    requestAnimationFrame(animate);
+                    
+                    if (!isRecording) {{
+                        simTime += 0.03;
+                        uniforms.u_time.value = simTime;
+                        renderer.render(scene, camera);
+                    }}
+                }}
+                animate();
+
+                window.processRecording = function() {{
+                    let currentFrame = 0;
+                    recordedFrames = [];
+                    let deltaT = 0.05;
+
+                    function captureNext() {{
+                        if (currentFrame < frameCount) {{
+                            simTime += deltaT;
+                            uniforms.u_time.value = simTime;
+                            renderer.render(scene, camera);
+
+                            let gl = renderer.getContext();
+                            let pixels = new Uint8Array(320 * 320 * 4);
+                            gl.readPixels(0, 0, 320, 320, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+                            recordedFrames.push(pixels);
+
+                            currentFrame++;
+                            statusDiv.innerText = "⚡ Perekaman GPU Dual-Shader: " + currentFrame + " / " + frameCount + " Frame";
+                            setTimeout(captureNext, 10);
+                        }} else {{
+                            statusDiv.innerText = "⚙️ Mengompresi GIF Dual-Shader... Mohon tunggu.";
+                            setTimeout(compileGIF, 50);
+                        }}
+                    }}
+                    captureNext();
+                }};
+            }});
+
+            function startRecording() {{
+                if (isRecording) return;
+                isRecording = true;
+                recBtn.disabled = true;
+                statusDiv.innerText = "⚡ Memulai Perekaman...";
+                window.processRecording();
+            }}
+
+            function compileGIF() {{
+                const width = 320;
+                const height = 320;
+                let gifBuffer = new Uint8Array(width * height * frameCount * 5);
+                let gifWriter = new omggif.GifWriter(gifBuffer, width, height, {{ loop: 0 }});
+
+                let palette = [];
+                for (let r = 0; r < 8; r++) {{
+                    for (let g = 0; g < 8; g++) {{
+                        for (let b = 0; b < 4; b++) {{
+                            palette.push((r * 36 << 16) | (g * 36 << 8) | (b * 85));
+                        }}
+                    }}
+                }}
+
+                for (let f = 0; f < recordedFrames.length; f++) {{
+                    let pixels = recordedFrames[f];
+                    let indexedPixels = new Uint8Array(width * height);
+                    
+                    for (let y = 0; y < height; y++) {{
+                        for (let x = 0; x < width; x++) {{
+                            let srcIdx = ((height - 1 - y) * width + x) * 4;
+                            let dstIdx = y * width + x;
+                            
+                            let r = pixels[srcIdx];
+                            let g = pixels[srcIdx + 1];
+                            let b = pixels[srcIdx + 2];
+                            
+                            let rIdx = Math.min(7, Math.floor(r / 32));
+                            let gIdx = Math.min(7, Math.floor(g / 32));
+                            let bIdx = Math.min(3, Math.floor(b / 64));
+                            
+                            indexedPixels[dstIdx] = (rIdx * 32) + (gIdx * 4) + bIdx;
+                        }}
+                    }}
+                    
+                    gifWriter.addFrame(0, 0, width, height, indexedPixels, {{
+                        palette: palette,
+                        delay: Math.round(100 / fps)
+                    }});
+                }}
+
+                let realLen = gifWriter.end();
+                let finalBlob = new Blob([gifBuffer.subarray(0, realLen)], {{ type: 'image/gif' }});
+                let downloadUrl = URL.createObjectURL(finalBlob);
                 
-                for i in range(total_frames):
-                    t = (i / float(total_frames)) * 2.0 * math.pi
-                    frame = process_dual_shader_frame(
-                        img_np, t=t,
-                        fx1=fx1, speed1=speed1, int1=int1, scale1=scale1, col1=col1,
-                        fx2=fx2, speed2=speed2, int2=int2, scale2=scale2, col2=col2,
-                        blend_mode=blend_mode, blend_ratio=blend_ratio
-                    )
-                    frames.append(frame)
+                let a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = "Terraria_Dual_Shader_FX.gif";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
 
-                # Simpan GIF ke RAM buffer
-                gif_buffer = io.BytesIO()
-                imageio.mimsave(gif_buffer, frames, format="GIF", fps=gif_fps, loop=0)
-                gif_bytes = gif_buffer.getvalue()
+                isRecording = false;
+                recBtn.disabled = false;
+                statusDiv.innerText = "✅ GIF Dual-Shader Berhasil Diunduh!";
+            }}
+        </script>
+    </body>
+    </html>
+    """
 
-            st.success("✅ Rendering selesai!")
-            st.image(gif_bytes, caption="GIF Hasil Export", use_container_width=True)
-            
-            st.download_button(
-                label="💾 Download Dual Shader GIF",
-                data=gif_bytes,
-                file_name="Terraria_Dual_Shader.gif",
-                mime="image/gif",
-                use_container_width=True
-            )
+    with col_view:
+        st.subheader("📺 Hasil Visual Dual Shader & Fast GIF Generator")
+        components.html(html_png_shader_code, height=520)
 
 else:
-    st.info("👈 Silakan unggah gambar PNG transparan di menu Sidebar sebelah kiri untuk memulai studio!")
+    with col_view:
+        st.info("👈 Silakan unggah gambar PNG transparan di menu sebelah kiri untuk memulai studio & mengunduh GIF!")
