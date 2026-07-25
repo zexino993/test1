@@ -11,10 +11,10 @@ st.set_page_config(
     page_title="Terraria Sprite Master Studio",
     page_icon="⚔️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# Custom Theme CSS (Terraria Dark Studio UI)
+# Custom Theme CSS (Terraria Dark Studio UI - Top Bar)
 st.markdown("""
 <style>
     .main {
@@ -36,21 +36,26 @@ st.markdown("""
         border-color: #ffffff;
         box-shadow: 0 0 12px rgba(163, 75, 251, 0.6);
     }
-    .stSelectbox, .stSlider, .stColorPicker {
+    .stSelectbox, .stSlider, .stColorPicker, .stNumberInput {
         background-color: #130b21;
         border-radius: 6px;
     }
     .stTab {
         font-weight: bold;
     }
+    div[data-testid="stExpander"] {
+        border: 1px solid #3a1c5d;
+        border-radius: 10px;
+        background-color: #110822;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚔️ Terraria Sprite Master Studio v16.0")
-st.caption("Studio All-in-One: **Directional Pulse Waves**, **15 Textures**, & **Custom Sprite Sheet Generator**.")
+st.title("⚔️ Terraria Sprite Master Studio v17.0")
+st.caption("Studio All-in-One: **Top Control Panel**, **Directional Pulse**, **15 Textures**, & **Sprite Sheet Generator**.")
 
 # ==========================================
-# 2. PRESET PALET WARNA LENGKAP & MAPPING
+# 2. PRESET PALET WARNA & TEKSTUR LIST
 # ==========================================
 PRESET_NAMES = {
     'manual': 'Custom (Manual)',
@@ -94,6 +99,24 @@ PRESETS = {
     'shroomite': {'shadow': '#000a1a', 'mid': '#0055ff', 'glow': '#00e1ff'}
 }
 
+TEX_OPTIONS = [
+    ('Smooth Klasik (Tanpa Tekstur)', 'smooth'),
+    ('💎 Crystal Facets (Faset Kristal)', 'crystal'),
+    ('🪨 Stone Grain (Batuan Alami)', 'stone'),
+    ('✨ Metallic Sparkle (Kilauan Logam)', 'sparkle'),
+    ('🌋 Magma / Lava Veins (Urat Lava)', 'veins'),
+    ('🔮 Obsidian Glass Slits (Kaca Striasi)', 'obsidian'),
+    ('🌿 Organic Moss / Spores (Spora/Lumut)', 'moss'),
+    ('🌌 Cosmic Swirl (Pusaran Nebula)', 'cosmic'),
+    ('📜 Runic Glyphs (Ukiran Sihir/Rune)', 'runic'),
+    ('🐉 Dragon Scales (Sisik Naga/Reptil)', 'scale'),
+    ('🪵 Wood Grain (Serat Kayu Alami)', 'wood'),
+    ('🍯 Honeycomb (Sarang Lebah/Hex)', 'honey'),
+    ('👾 Cyber Glitch (Piksel Digital)', 'glitch'),
+    ('🟢 Slime Bubbles (Gelembung Lendir)', 'slime'),
+    ('❄️ Frost Shards (Kristal Es Sharp)', 'frost')
+]
+
 # Session State Setup
 if 'shadow_picker' not in st.session_state: st.session_state.shadow_picker = "#080214"
 if 'mid_picker' not in st.session_state: st.session_state.mid_picker = "#AA19F5"
@@ -109,80 +132,59 @@ def on_preset_change():
         st.session_state.pastel_mode_val = ('pastel' in p_key)
 
 # ==========================================
-# 3. SIDEBAR CONTROLS
+# 3. TOP CONTROL PANEL (MENU ATAS GRID)
 # ==========================================
-st.sidebar.header("📁 1. Input Sprite & Mode")
-uploaded_file = st.sidebar.file_uploader("Upload PNG Sprite / Tile", type=["png"])
+with st.expander("🎛️ PANEL KONTROL & PENGATURAN SPRITE (KLIK UNTUK BUKA / TUTUP)", expanded=True):
+    ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns(4)
 
-sprite_type = st.sidebar.selectbox(
-    "Jenis Sprite:",
-    ["Item / Senjata / Aksesori", "Tile / Blok / Wall", "Character / NPC / Pet", "Projectiles / FX"]
-)
+    with ctrl_col1:
+        st.markdown("##### 📁 1. Input & Mode Utama")
+        uploaded_file = st.file_uploader("Upload PNG Sprite / Tile", type=["png"])
+        sprite_type = st.selectbox(
+            "Jenis Sprite:",
+            ["Item / Senjata / Aksesori", "Tile / Blok / Wall", "Character / NPC / Pet", "Projectiles / FX"]
+        )
+        use_orig_color = st.checkbox("🔒 Gunakan Warna Asli", value=False)
+        pastel_mode = st.checkbox("🌸 Soft RGB Pastel Tone", key="pastel_mode_val")
+        zoom = st.slider("🔍 Zoom Magnifier", 1, 10, 4)
 
-use_orig_color = st.sidebar.checkbox("🔒 Gunakan Warna Asli (Matikan Recolor)", value=False)
-if use_orig_color:
-    st.sidebar.caption("⚠️ *Fitur Recolor & Preset dinonaktifkan karena 'Warna Asli' aktif.*")
+    with ctrl_col2:
+        st.markdown("##### 🎨 2. Palette & Presets")
+        st.selectbox(
+            "Pilih Preset Sprite:",
+            options=list(PRESET_NAMES.keys()),
+            format_func=lambda x: PRESET_NAMES.get(x, x),
+            key="preset_choice",
+            on_change=on_preset_change
+        )
+        shadow_color = st.color_picker("1. Shadow Celah", key="shadow_picker")
+        mid_color = st.color_picker("2. Warna Utama", key="mid_picker")
+        glow_color = st.color_picker("3. Glow Highlight", key="glow_picker")
+        hue_shift = st.slider("RGB Hue Shift", 0, 360, 0, 5)
+        vibrancy = st.slider("Saturasi / Vibrancy", 0.5, 2.0, 1.1, 0.1)
 
-pastel_mode = st.sidebar.checkbox("🌸 Soft RGB Pastel Tone", key="pastel_mode_val")
-zoom = st.sidebar.slider("🔍 Zoom Magnifier", 1, 10, 4)
+    with ctrl_col3:
+        st.markdown("##### ✏️ 3. Border & Filter Foto")
+        enable_outline = st.checkbox("Tambahkan Auto Outline", value=True)
+        outline_color_mode = st.selectbox("Warna Outline:", ["Black (Terraria Classic)", "Custom Color", "Glowing Pulse Color"])
+        outline_color = st.color_picker("Warna Outline Custom", "#000000")
+        outline_thickness = st.slider("Ketebalan Border (px)", 1, 3, 1)
+        brightness = st.slider("Brightness", 0.5, 2.0, 1.0, 0.05)
+        contrast = st.slider("Contrast", 0.5, 2.0, 1.0, 0.05)
 
-with st.sidebar.expander("🎨 2. Presets & Warna Palette", expanded=True):
-    st.selectbox(
-        "Pilih Preset Sprite:",
-        options=list(PRESET_NAMES.keys()),
-        format_func=lambda x: PRESET_NAMES.get(x, x),
-        key="preset_choice",
-        on_change=on_preset_change
-    )
-    
-    shadow_color = st.color_picker("1. Shadow Celah", key="shadow_picker")
-    mid_color = st.color_picker("2. Warna Utama", key="mid_picker")
-    glow_color = st.color_picker("3. Glow Highlight", key="glow_picker")
-    
-    hue_shift = st.slider("RGB Hue Shift", 0, 360, 0, 5)
-    vibrancy = st.slider("Saturasi / Vibrancy", 0.5, 2.0, 1.1, 0.1)
-
-with st.sidebar.expander("✏️ 3. Terraria Outline / Border", expanded=False):
-    enable_outline = st.checkbox("Tambahkan Auto Outline / Border", value=True)
-    outline_color_mode = st.selectbox("Warna Outline:", ["Black (Terraria Classic)", "Custom Color", "Glowing Pulse Color"])
-    outline_color = st.color_picker("Warna Outline Custom", "#000000")
-    outline_thickness = st.slider("Ketebalan Border (px)", 1, 3, 1)
-
-with st.sidebar.expander("🎛️ 4. Filter Foto & Adjustment", expanded=False):
-    brightness = st.slider("Brightness", 0.5, 2.0, 1.0, 0.05)
-    contrast = st.slider("Contrast", 0.5, 2.0, 1.0, 0.05)
-
-with st.sidebar.expander("🔀 5. Textures & 3D Shading (15 Types)", expanded=False):
-    TEX_OPTIONS = [
-        ('Smooth Klasik (Tanpa Tekstur)', 'smooth'),
-        ('💎 Crystal Facets (Faset Kristal)', 'crystal'),
-        ('🪨 Stone Grain (Batuan Alami)', 'stone'),
-        ('✨ Metallic Sparkle (Kilauan Logam)', 'sparkle'),
-        ('🌋 Magma / Lava Veins (Urat Lava)', 'veins'),
-        ('🔮 Obsidian Glass Slits (Kaca Striasi)', 'obsidian'),
-        ('🌿 Organic Moss / Spores (Spora/Lumut)', 'moss'),
-        ('🌌 Cosmic Swirl (Pusaran Nebula)', 'cosmic'),
-        ('📜 Runic Glyphs (Ukiran Sihir/Rune)', 'runic'),
-        ('🐉 Dragon Scales (Sisik Naga/Reptil)', 'scale'),
-        ('🪵 Wood Grain (Serat Kayu Alami)', 'wood'),
-        ('🍯 Honeycomb (Sarang Lebah/Hex)', 'honey'),
-        ('👾 Cyber Glitch (Piksel Digital)', 'glitch'),
-        ('🟢 Slime Bubbles (Gelembung Lendir)', 'slime'),
-        ('❄️ Frost Shards (Kristal Es Sharp)', 'frost')
-    ]
-    tex_primary = st.selectbox("Tekstur Utama:", options=TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
-    tex_secondary = st.selectbox("Tekstur Kedua:", options=[('Tidak Ada', 'none')] + TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
-    blend_ratio = st.slider("Rasio Blend Tekstur", 0.0, 1.0, 0.3, 0.05)
-    tex_intensity = st.slider("Kekuatan Tekstur", 0.0, 1.0, 0.35, 0.05)
-    depth_mult = st.slider("Intensitas 3D Depth", 0.5, 3.0, 1.5, 0.1)
-
-with st.sidebar.expander("💡 6. Glowmask & Directional Pulse Settings", expanded=True):
-    threshold = st.slider("Sensitivitas Glow Area", 0.1, 0.9, 0.45, 0.02)
-    pulse_intensity = st.slider("Kekuatan Denyut Pulse", 0.1, 1.0, 0.5, 0.05)
-    pulse_direction = st.selectbox(
-        "Arah Denyut Pulse (Pulse Direction):",
-        ["Seperti Biasa (Uniform)", "Dari Atas ⬇️", "Dari Bawah ⬆️", "Dari Kiri ➡️", "Dari Kanan ⬅️"]
-    )
+    with ctrl_col4:
+        st.markdown("##### 🔀 4. Tekstur 3D & Pulse")
+        tex_primary = st.selectbox("Tekstur Utama:", options=TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
+        tex_secondary = st.selectbox("Tekstur Kedua:", options=[('Tidak Ada', 'none')] + TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
+        blend_ratio = st.slider("Rasio Blend Tekstur", 0.0, 1.0, 0.3, 0.05)
+        tex_intensity = st.slider("Kekuatan Tekstur", 0.0, 1.0, 0.35, 0.05)
+        depth_mult = st.slider("Intensitas 3D Depth", 0.5, 3.0, 1.5, 0.1)
+        threshold = st.slider("Sensitivitas Glow Area", 0.1, 0.9, 0.45, 0.02)
+        pulse_intensity = st.slider("Kekuatan Denyut Pulse", 0.1, 1.0, 0.5, 0.05)
+        pulse_direction = st.selectbox(
+            "Arah Denyut Pulse:",
+            ["Seperti Biasa (Uniform)", "Dari Atas ⬇️", "Dari Bawah ⬆️", "Dari Kiri ➡️", "Dari Kanan ⬅️"]
+        )
 
 # ==========================================
 # 4. HELPER & CORE ENGINE FUNCTIONS
@@ -346,7 +348,6 @@ def render_studio_all(arr, extra_hue=0):
 
     return out_img, glow_img, lum, glow_alpha
 
-# HELPER GENERATOR FRAME PULSE BERARAH (DIRECTIONAL PULSE GENERATOR)
 def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensity, p_direction):
     base_rgb = np.array(out_img, dtype=np.float32)[:, :, :3]
     alpha_arr = np.array(out_img)[:, :, 3:]
@@ -580,4 +581,4 @@ if uploaded_file is not None:
             st.download_button("📊 Download Sprite Sheet PNG", data=st.session_state['spritesheet_bytes'], file_name="TerrariaSprite_Sheet.png", mime="image/png", use_container_width=True)
 
 else:
-    st.info("👈 Silakan unggah sprite PNG (Senjata, Zirah, NPC, Tile, Pet) di sidebar kiri untuk memulai studio!")
+    st.info("👆 Silakan unggah sprite PNG (Senjata, Zirah, NPC, Tile, Pet) pada Panel Kontrol di atas untuk memulai studio!")
