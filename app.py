@@ -8,13 +8,13 @@ import streamlit as st
 # 1. KONFIGURASI HALAMAN & THEME UI/UX
 # ==========================================
 st.set_page_config(
-    page_title="Terraria Sprite Master Studio",
+    page_title="Terraria Sprite Master Studio v19.0",
     page_icon="⚔️",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Custom Theme CSS (Terraria Dark Studio UI - Top Bar)
+# Custom Theme CSS (Terraria Dark Studio UI)
 st.markdown("""
 <style>
     .main {
@@ -51,8 +51,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚔️ Terraria Sprite Master Studio v18.1")
-st.caption("Studio All-in-One: **Full Sprite Pulse**, **Directional Waves**, **15 Textures**, & **Sprite Sheet Generator**.")
+st.title("⚔️ Terraria Sprite Master Studio v19.0 Pro")
+st.caption("Studio All-in-One: **Precision Magic Wand**, **Fitting Preview**, **Canvas Resizer**, **Multi-Motion Engine**, & **Palette Extractor**.")
 
 # ==========================================
 # 2. PRESET PALET WARNA & TEKSTUR LIST
@@ -138,7 +138,7 @@ with st.expander("🎛️ PANEL KONTROL & PENGATURAN SPRITE (KLIK UNTUK BUKA / T
     ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns(4)
 
     with ctrl_col1:
-        st.markdown("##### 📁 1. Input & Mode Utama")
+        st.markdown("##### 📁 1. Input & Canvas Resizer")
         uploaded_file = st.file_uploader("Upload PNG Sprite / Tile", type=["png"])
         sprite_type = st.selectbox(
             "Jenis Sprite:",
@@ -147,6 +147,13 @@ with st.expander("🎛️ PANEL KONTROL & PENGATURAN SPRITE (KLIK UNTUK BUKA / T
         use_orig_color = st.checkbox("🔒 Gunakan Warna Asli", value=False)
         pastel_mode = st.checkbox("🌸 Soft RGB Pastel Tone", key="pastel_mode_val")
         zoom = st.slider("🔍 Zoom Magnifier", 1, 10, 4)
+
+        # FITUR 1: Custom Canvas Resizer & Padding
+        st.markdown("---")
+        st.markdown("##### 🔲 Canvas Resizer")
+        enable_resize = st.checkbox("Aktifkan Canvas Expansion", value=False)
+        target_canvas_w = st.number_input("Target Lebar Kanvas (px):", min_value=16, max_value=256, value=32)
+        target_canvas_h = st.number_input("Target Tinggi Kanvas (px):", min_value=16, max_value=256, value=32)
 
     with ctrl_col2:
         st.markdown("##### 🎨 2. Palette & Presets")
@@ -164,7 +171,13 @@ with st.expander("🎛️ PANEL KONTROL & PENGATURAN SPRITE (KLIK UNTUK BUKA / T
         vibrancy = st.slider("Saturasi / Vibrancy", 0.5, 2.0, 1.1, 0.1)
 
     with ctrl_col3:
-        st.markdown("##### ✏️ 3. Border & Filter Foto")
+        st.markdown("##### 🪄 3. Magic Wand & Filters")
+        # FITUR 2: Magic Wand Precision Color Isolator
+        enable_magic_wand = st.checkbox("🪄 Aktifkan Magic Wand (Target Warna)", value=False)
+        target_magic_color = st.color_picker("Target Warna Asli Ditukar:", "#FF0000")
+        color_tolerance = st.slider("Toleransi Warna (Tolerance):", 0.0, 1.0, 0.2, 0.02)
+        
+        st.markdown("---")
         enable_outline = st.checkbox("Tambahkan Auto Outline", value=True)
         outline_color_mode = st.selectbox("Warna Outline:", ["Black (Terraria Classic)", "Custom Color", "Glowing Pulse Color"])
         outline_color = st.color_picker("Warna Outline Custom", "#000000")
@@ -173,24 +186,24 @@ with st.expander("🎛️ PANEL KONTROL & PENGATURAN SPRITE (KLIK UNTUK BUKA / T
         contrast = st.slider("Contrast", 0.5, 2.0, 1.0, 0.05)
 
     with ctrl_col4:
-        st.markdown("##### 🔀 4. Tekstur 3D & Pulse")
+        st.markdown("##### 🔀 4. Tekstur 3D & Animation")
         tex_primary = st.selectbox("Tekstur Utama:", options=TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
         tex_secondary = st.selectbox("Tekstur Kedua:", options=[('Tidak Ada', 'none')] + TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
         blend_ratio = st.slider("Rasio Blend Tekstur", 0.0, 1.0, 0.3, 0.05)
         tex_intensity = st.slider("Kekuatan Tekstur", 0.0, 1.0, 0.35, 0.05)
         depth_mult = st.slider("Intensitas 3D Depth", 0.5, 3.0, 1.5, 0.1)
         
-        st.markdown("##### 💡 5. Glow & Pulse")
+        st.markdown("##### 🌀 5. Motion & Pulse Engine")
         threshold = st.slider("Sensitivitas Glow Area", 0.1, 0.9, 0.45, 0.02)
-        pulse_target = st.selectbox(
-            "Target Area Denyut (Pulse Target):",
-            ["Hanya Area Glow", "Seluruh Sprite"]
+        
+        # FITUR 4: Multi-Mode Motion Engine
+        anim_motion_mode = st.selectbox(
+            "Jenis Gerakan Animasi:",
+            ["Pulse Light Wave", "Floating / Bobbing Up-Down", "360° Weapon Swing", "Sci-Fi Glitch Flicker"]
         )
-        pulse_direction = st.selectbox(
-            "Arah Denyut Pulse:",
-            ["Seperti Biasa (Uniform)", "Dari Atas ⬇️", "Dari Bawah ⬆️", "Dari Kiri ➡️", "Dari Kanan ⬅️"]
-        )
-        pulse_intensity = st.slider("Kekuatan Denyut Pulse", 0.1, 1.0, 0.5, 0.05)
+        pulse_target = st.selectbox("Target Area Denyut:", ["Hanya Area Glow", "Seluruh Sprite"])
+        pulse_direction = st.selectbox("Arah Denyut Pulse:", ["Seperti Biasa (Uniform)", "Dari Atas ⬇️", "Dari Bawah ⬆️", "Dari Kiri ➡️", "Dari Kanan ⬅️"])
+        pulse_intensity = st.slider("Kekuatan Denyut / Motion", 0.1, 1.0, 0.5, 0.05)
 
 # ==========================================
 # 4. HELPER & CORE ENGINE FUNCTIONS
@@ -214,6 +227,32 @@ def add_border_to_image(img_rgba, color=(0,0,0,255), thickness=1):
     border_img = Image.new("RGBA", (w, h), color)
     border_img.putalpha(mask)
     return Image.alpha_composite(border_img, img_rgba)
+
+# HELPER FITUR 1: Resize Canvas dengan Center Offset
+def expand_canvas(img_rgba, new_w, new_h):
+    w, h = img_rgba.size
+    if new_w < w and new_h < h: return img_rgba
+    new_w, new_h = max(w, new_w), max(h, new_h)
+    new_canvas = Image.new("RGBA", (new_w, new_h), (0, 0, 0, 0))
+    offset_x = (new_w - w) // 2
+    offset_y = (new_h - h) // 2
+    new_canvas.paste(img_rgba, (offset_x, offset_y))
+    return new_canvas
+
+# HELPER FITUR 5: Palette Extractor
+def extract_palette_from_img(img_rgba, num_colors=6):
+    img_rgb = img_rgba.convert("RGB")
+    colors = img_rgb.getcolors(maxcolors=10000)
+    if not colors: return []
+    sorted_colors = sorted(colors, key=lambda x: x[0], reverse=True)
+    hex_palette = []
+    for count, (r, g, b) in sorted_colors:
+        if (r < 10 and g < 10 and b < 10): continue # Skip near-black transparency background
+        hex_code = f"#{r:02x}{g:02x}{b:02x}"
+        if hex_code not in hex_palette:
+            hex_palette.append(hex_code)
+        if len(hex_palette) >= num_colors: break
+    return hex_palette
 
 def get_single_texture_map(height, width, tex_type, intensity):
     if tex_type in ['smooth', 'none'] or intensity == 0:
@@ -289,6 +328,15 @@ def render_studio_all(arr, extra_hue=0):
     r_chan, g_chan, b_chan, alpha = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2], arr[:, :, 3]
     lum = (0.299 * r_chan + 0.587 * g_chan + 0.114 * b_chan) / 255.0
 
+    # HELPER FITUR 2: Magic Wand Precision Color Masking
+    if enable_magic_wand:
+        t_target = np.array(hex_to_rgb(target_magic_color), dtype=np.float32)
+        curr_rgb = np.dstack((r_chan, g_chan, b_chan)).astype(np.float32)
+        dist = np.sqrt(np.sum((curr_rgb - t_target)**2, axis=-1)) / 441.673  # Normalized Euclidean Distance
+        wand_mask = dist <= color_tolerance
+    else:
+        wand_mask = np.ones((height, width), dtype=bool)
+
     if use_orig_color:
         main_rgb = np.dstack((r_chan, g_chan, b_chan)).astype(np.float32)
         if (hue_shift + extra_hue) > 0:
@@ -311,24 +359,28 @@ def render_studio_all(arr, extra_hue=0):
         c_mid = np.array(hex_to_rgb(mid_color), dtype=np.float32)
         c_glow = np.array(hex_to_rgb(glow_color), dtype=np.float32)
 
-        out_rgb = np.zeros((height, width, 3), dtype=np.float32)
+        recolored_rgb = np.zeros((height, width, 3), dtype=np.float32)
         mask_low = final_lum < 0.35
         factor_low = np.expand_dims(np.clip(final_lum / 0.35, 0, 1), axis=-1)
-        out_rgb += np.where(np.expand_dims(mask_low, axis=-1), c_shadow + factor_low * (c_mid - c_shadow), 0)
+        recolored_rgb += np.where(np.expand_dims(mask_low, axis=-1), c_shadow + factor_low * (c_mid - c_shadow), 0)
 
         mask_high = ~mask_low
         factor_high = np.expand_dims(np.clip((final_lum - 0.35) / 0.65, 0, 1), axis=-1)
-        out_rgb += np.where(np.expand_dims(mask_high, axis=-1), c_mid + factor_high * (c_glow - c_mid), 0)
+        recolored_rgb += np.where(np.expand_dims(mask_high, axis=-1), c_mid + factor_high * (c_glow - c_mid), 0)
 
         total_hue = (hue_shift + extra_hue) % 360
         if total_hue > 0:
-            out_rgb = apply_hue_shift(out_rgb, total_hue)
+            recolored_rgb = apply_hue_shift(recolored_rgb, total_hue)
 
-        gray = np.expand_dims(0.299 * out_rgb[:, :, 0] + 0.587 * out_rgb[:, :, 1] + 0.114 * out_rgb[:, :, 2], axis=-1)
-        out_rgb = gray + vibrancy * (out_rgb - gray)
+        gray = np.expand_dims(0.299 * recolored_rgb[:, :, 0] + 0.587 * recolored_rgb[:, :, 1] + 0.114 * recolored_rgb[:, :, 2], axis=-1)
+        recolored_rgb = gray + vibrancy * (recolored_rgb - gray)
 
         if st.session_state.pastel_mode_val:
-            out_rgb = out_rgb * 0.6 + 255.0 * 0.4 * (out_rgb / 255.0)**0.5
+            recolored_rgb = recolored_rgb * 0.6 + 255.0 * 0.4 * (recolored_rgb / 255.0)**0.5
+
+        # Terapkan Magic Wand Masking (Hanya ganti area target)
+        orig_rgb = np.dstack((r_chan, g_chan, b_chan)).astype(np.float32)
+        out_rgb = np.where(np.expand_dims(wand_mask, axis=-1), recolored_rgb, orig_rgb)
 
         out_rgb = np.clip(out_rgb, 0, 255).astype(np.uint8)
         alpha_uint8 = alpha.astype(np.uint8)
@@ -354,7 +406,28 @@ def render_studio_all(arr, extra_hue=0):
 
     return out_img, glow_img, lum, glow_alpha
 
-def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensity, p_direction, p_target):
+# MULTI-MODE MOTION & ANIMATION GENERATOR (FITUR 4)
+def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensity, p_direction, p_target, motion_mode):
+    if motion_mode == "360° Weapon Swing":
+        angle = (frame_idx / float(total_frames)) * 360.0
+        return out_img.rotate(angle, resample=Image.BICUBIC)
+
+    elif motion_mode == "Floating / Bobbing Up-Down":
+        offset_y = int(math.sin(2.0 * math.pi * (frame_idx / float(total_frames))) * 4.0 * p_intensity)
+        w, h = out_img.size
+        shifted = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        shifted.paste(out_img, (0, offset_y))
+        return shifted
+
+    elif motion_mode == "Sci-Fi Glitch Flicker":
+        if frame_idx % 2 == 0:
+            return out_img
+        else:
+            arr_glitch = np.array(out_img)
+            arr_glitch[:, :, :3] = np.clip(arr_glitch[:, :, :3] * 1.4, 0, 255).astype(np.uint8)
+            return Image.fromarray(arr_glitch, mode="RGBA")
+
+    # Mode Pulse Normal
     base_rgb = np.array(out_img, dtype=np.float32)[:, :, :3]
     alpha_arr = np.array(out_img)[:, :, 3:]
     height, width = glow_alpha.shape
@@ -414,11 +487,43 @@ def create_spritesheet(frames, cols, padding=0):
         
     return sheet
 
+# HELPER FITUR 3: Terraria Mannequin Fitting Preview
+def generate_fitting_preview(sprite_img, slot_type):
+    # Dummy Procedural Terraria Character Mannequin Base Canvas (40x56 px)
+    mannequin = Image.new("RGBA", (40, 56), (30, 20, 45, 255))
+    
+    # Simple Character Dummy Body Pixels
+    head = Image.new("RGBA", (12, 12), (220, 170, 130, 255))
+    body = Image.new("RGBA", (14, 18), (100, 100, 150, 255))
+    legs = Image.new("RGBA", (12, 14), (60, 60, 80, 255))
+    
+    mannequin.paste(head, (14, 6))
+    mannequin.paste(body, (13, 18))
+    mannequin.paste(legs, (14, 36))
+    
+    # Fitting Attachment Offsets
+    sp_w, sp_h = sprite_img.size
+    fit_canvas = mannequin.copy()
+    
+    if "Item / Senjata" in slot_type or "Projectiles" in slot_type:
+        fit_canvas.paste(sprite_img, (22, 16), sprite_img)
+    elif "Character / NPC" in slot_type:
+        fit_canvas.paste(sprite_img, ((40 - sp_w)//2, (56 - sp_h)//2), sprite_img)
+    else: # Helmet / Accessory
+        fit_canvas.paste(sprite_img, ((40 - sp_w)//2, 4), sprite_img)
+        
+    return fit_canvas
+
 # ==========================================
 # 5. MAIN DASHBOARD STUDIO
 # ==========================================
 if uploaded_file is not None:
     orig_img = Image.open(uploaded_file).convert("RGBA")
+    
+    # Terapkan Canvas Expansion jika diaktifkan (Fitur 1)
+    if enable_resize:
+        orig_img = expand_canvas(orig_img, target_canvas_w, target_canvas_h)
+        
     arr = np.array(orig_img, dtype=np.float32)
 
     out_img, glow_img, lum_map, glow_alpha = render_studio_all(arr)
@@ -430,12 +535,13 @@ if uploaded_file is not None:
     glow_z = glow_img.resize((w * zoom, h * zoom), Image.NEAREST)
     rgb_z = rgb_shift_img.resize((w * zoom, h * zoom), Image.NEAREST)
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "🖼️ Quad-Preview Matrix", 
+        "🛡️ Character Fitting Preview", 
         "🧩 3x3 Tile Grid Test", 
         "📊 Sprite Sheet Builder", 
-        "🎬 GIF Animation Studio", 
-        "💾 Export Center"
+        "🎬 GIF Motion Studio", 
+        "💾 Export & Palette Extractor"
     ])
 
     with tab1:
@@ -450,7 +556,22 @@ if uploaded_file is not None:
         col4.caption("4. RGB Spectrum Shift")
         col4.image(rgb_z, use_container_width=True)
 
+    # TAB FITUR 3: Dual-Layer Armor & Fitting Preview
     with tab2:
+        st.subheader("🛡️ Terraria Character Fitting Preview")
+        st.caption("Uji tampilan sprite langsung pada manekin / tubuh karakter Terraria secara live.")
+        
+        fit_img = generate_fitting_preview(out_img, sprite_type)
+        fit_z = fit_img.resize((fit_img.width * max(2, zoom), fit_img.height * max(2, zoom)), Image.NEAREST)
+        
+        col_fit1, col_fit2 = st.columns([1, 2])
+        with col_fit1:
+            st.image(fit_z)
+        with col_fit2:
+            st.success(f"✅ **Slot Fitting Active:** `{sprite_type}`")
+            st.write("Preview ini mensimulasikan posisi sprite kamu saat digunakan di dalam game Terraria!")
+
+    with tab3:
         st.subheader("🧩 3x3 Tile & Wall Seamless Test")
         st.caption("Uji pola seamless ubin/dinding dalam kisi 3x3 bertumpuk.")
         grid_3x3 = Image.new("RGBA", (w * zoom * 3, h * zoom * 3), (20, 15, 30, 255))
@@ -459,7 +580,7 @@ if uploaded_file is not None:
                 grid_3x3.paste(out_z, (gx * w * zoom, gy * h * zoom))
         st.image(grid_3x3)
 
-    with tab3:
+    with tab4:
         st.subheader("📊 Custom Sprite Sheet Generator")
         st.caption("Buat Sprite Sheet animasi berformat PNG transparan siap pakai untuk Mod Terraria / Game Engine.")
 
@@ -467,7 +588,7 @@ if uploaded_file is not None:
         with ss_col1:
             sheet_anim_type = st.selectbox(
                 "Jenis Animasi Frame:",
-                ["Glow Pulse Frames", "RGB Rainbow Hue Cycle", "Recolor Spectrum Wave"]
+                ["Motion Engine Frames", "RGB Rainbow Hue Cycle", "Recolor Spectrum Wave"]
             )
             frame_count = st.slider("Jumlah Frame Animasi:", min_value=2, max_value=20, value=8, step=1)
             
@@ -488,9 +609,9 @@ if uploaded_file is not None:
         if st.button("🚀 Generate Sprite Sheet", use_container_width=True):
             sheet_frames = []
             
-            if sheet_anim_type == "Glow Pulse Frames":
+            if sheet_anim_type == "Motion Engine Frames":
                 for i in range(frame_count):
-                    f_img = generate_pulse_frame(out_img, glow_alpha, i, frame_count, pulse_intensity, pulse_direction, pulse_target)
+                    f_img = generate_pulse_frame(out_img, glow_alpha, i, frame_count, pulse_intensity, pulse_direction, pulse_target, anim_motion_mode)
                     sheet_frames.append(f_img)
                     
             elif sheet_anim_type == "RGB Rainbow Hue Cycle":
@@ -511,7 +632,7 @@ if uploaded_file is not None:
             spritesheet_img.save(buf_ss, format="PNG")
             st.session_state['spritesheet_bytes'] = buf_ss.getvalue()
             st.session_state['spritesheet_size'] = spritesheet_img.size
-            st.session_state['spritesheet_info'] = f"Arah: {pulse_direction} | Target: {pulse_target}"
+            st.session_state['spritesheet_info'] = f"Motion: {anim_motion_mode} | Arah: {pulse_direction}"
 
         if 'spritesheet_bytes' in st.session_state:
             st.divider()
@@ -529,18 +650,18 @@ if uploaded_file is not None:
                 use_container_width=True
             )
 
-    with tab4:
-        st.subheader("🎬 GIF Animation Studio")
+    with tab5:
+        st.subheader("🎬 GIF Motion Studio")
         gif_col1, gif_col2 = st.columns(2)
 
         with gif_col1:
-            st.write(f"**1. Animasi Pulse ({pulse_target})**")
-            st.caption(f"Arah: {pulse_direction}")
-            if st.button("Preview Glow Pulse GIF 🎬", key="btn_pulse_prev", use_container_width=True):
+            st.write(f"**1. Mode Animasi Motion ({anim_motion_mode})**")
+            st.caption(f"Target: {pulse_target} | Arah: {pulse_direction}")
+            if st.button("Preview Motion GIF 🎬", key="btn_pulse_prev", use_container_width=True):
                 frames = []
                 num_frames = 12
                 for i in range(num_frames):
-                    f_img = generate_pulse_frame(out_img, glow_alpha, i, num_frames, pulse_intensity, pulse_direction, pulse_target)
+                    f_img = generate_pulse_frame(out_img, glow_alpha, i, num_frames, pulse_intensity, pulse_direction, pulse_target, anim_motion_mode)
                     if zoom > 1: f_img = f_img.resize((w * zoom, h * zoom), Image.NEAREST)
                     frames.append(f_img)
 
@@ -568,7 +689,20 @@ if uploaded_file is not None:
             if 'rgb_gif_bytes' in st.session_state:
                 st.image(st.session_state['rgb_gif_bytes'])
 
-    with tab5:
+    # TAB FITUR 5: Palette Extractor & Export Center
+    with tab6:
+        st.subheader("🎨 Auto Palette Extractor")
+        st.caption("Ekstrak kode warna dominan otomatis langsung dari gambar yang diunggah:")
+        
+        extracted_colors = extract_palette_from_img(orig_img, num_colors=8)
+        if extracted_colors:
+            pal_cols = st.columns(len(extracted_colors))
+            for idx, hex_c in enumerate(extracted_colors):
+                with pal_cols[idx]:
+                    st.color_picker(f"C-{idx+1}", hex_c, key=f"ext_pal_{idx}")
+                    st.code(hex_c)
+
+        st.divider()
         st.subheader("💾 Export Center")
         st.write("Unduh semua berkas hasil olahan sprite:")
         
@@ -585,7 +719,7 @@ if uploaded_file is not None:
         st.divider()
         col_ex3, col_ex4 = st.columns(2)
         if 'pulse_gif_bytes' in st.session_state:
-            col_ex3.download_button("🎬 Download Glow Pulse GIF", data=st.session_state['pulse_gif_bytes'], file_name="TerrariaSprite_Pulse.gif", mime="image/gif", use_container_width=True)
+            col_ex3.download_button("🎬 Download Motion GIF", data=st.session_state['pulse_gif_bytes'], file_name="TerrariaSprite_Motion.gif", mime="image/gif", use_container_width=True)
         if 'rgb_gif_bytes' in st.session_state:
             col_ex4.download_button("🌈 Download RGB Cycle GIF", data=st.session_state['rgb_gif_bytes'], file_name="TerrariaSprite_RGB.gif", mime="image/gif", use_container_width=True)
 
