@@ -46,7 +46,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚔️ Terraria Sprite Master Studio v13.0")
+st.title("⚔️ Terraria Sprite Master Studio v13.1")
 st.caption("Studio All-in-One untuk **Semua Sprite Terraria** (Senjata, Zirah, NPC, Pet, Tile, & Aksesori).")
 
 # ==========================================
@@ -176,19 +176,14 @@ def apply_hue_shift(rgb_array, hue_deg):
     h_arr = (np.array(h, dtype=np.int16) + int((hue_deg / 360.0) * 255)) % 256
     return np.array(Image.merge('HSV', (Image.fromarray(h_arr.astype(np.uint8)), s, v)).convert('RGB'), dtype=np.float32)
 
-# PERBAIKAN: Menggunakan ImageChops.maximum
+# PERBAIKAN UTAMA: Menggunakan ImageFilter.MaxFilter untuk outline dilation yang handal
 def add_border_to_image(img_rgba, color=(0,0,0,255), thickness=1):
     if thickness == 0: return img_rgba
     w, h = img_rgba.size
     alpha = img_rgba.split()[3]
     
-    mask = Image.new('L', (w, h), 0)
-    for dx in range(-thickness, thickness + 1):
-        for dy in range(-thickness, thickness + 1):
-            if dx*dx + dy*dy <= thickness*thickness:
-                shifted = Image.new('L', (w, h), 0)
-                shifted.paste(alpha, (dx, dy))
-                mask = ImageChops.maximum(mask, shifted)
+    # Dilation masker alpha menggunakan MaxFilter bawaan Pillow
+    mask = alpha.filter(ImageFilter.MaxFilter(thickness * 2 + 1))
                 
     border_img = Image.new("RGBA", (w, h), color)
     border_img.putalpha(mask)
