@@ -4,10 +4,10 @@ from PIL import Image
 import io
 import base64
 
-st.set_page_config(page_title="2D PNG Dual Shader Studio v3.4 Pro", layout="wide")
+st.set_page_config(page_title="2D PNG Dual Shader Studio v3.5 Pro", layout="wide")
 
-st.title("🖼️ Custom PNG Sprite Dual .FX Shader Studio v3.4")
-st.caption("Unggah gambar PNG transparan, gabungkan **2 FX Shader sekaligus** secara real-time, dan rekam GIF!")
+st.title("🖼️ Custom PNG Sprite Dual .FX Shader Studio v3.5")
+st.caption("Unggah gambar PNG transparan, gabungkan **2 FX Shader**, lalu unduh animasi sebagai **GIF** atau **Sprite Sheet PNG**!")
 
 # ==========================================
 # 1. INPUT FILE & DUAL SHADER CONTROLS
@@ -56,9 +56,10 @@ with col_ctrl:
     blend_ratio_val = st.slider("Rasio Campuran (Khusus Mode Mix)", 0.0, 1.0, 0.5, 0.05)
 
     st.markdown("---")
-    st.subheader("🎬 5. Rekam GIF Fast")
-    gif_duration = st.slider("Durasi Rekaman GIF (Detik):", 1, 5, 2)
+    st.subheader("🎬 5. Pengaturan Export Animasi")
+    gif_duration = st.slider("Durasi Rekaman GIF / Sheet (Detik):", 1, 5, 2)
     gif_fps = st.select_slider("Frame Rate (FPS):", options=[10, 12, 15, 20], value=15)
+    sheet_cols = st.slider("Jumlah Kolom Sprite Sheet:", 2, 8, 4)
 
 # Convert Colors HEX to RGB (0.0 - 1.0)
 def hex_to_rgb_norm(hex_str):
@@ -68,7 +69,6 @@ def hex_to_rgb_norm(hex_str):
 r1, g1, b1 = hex_to_rgb_norm(fx_color_1)
 r2, g2, b2 = hex_to_rgb_norm(fx_color_2)
 
-# Map Blending Mode
 blend_mode_id = 0 if "Additive" in blend_mode_choice else (1 if "Mix" in blend_mode_choice else 2)
 
 # ==========================================
@@ -81,7 +81,6 @@ if uploaded_file is not None:
     img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
     img_data_url = f"data:image/png;base64,{img_b64}"
 
-    # GLSL COMPACT HELPER FUNCTIONS FOR SHADERS
     glsl_helpers = """
         vec3 getLava(vec2 uv, float t, float spd, float scl, float intns, vec3 col, vec3 orig) {
             float noise = sin(uv.x * scl + t * spd) * cos(uv.y * scl + t * spd);
@@ -208,7 +207,7 @@ if uploaded_file is not None:
         }
     """
 
-    # HTML / WEBGL DUAL SHADER ENGINE DENGAN OMGIF EXPORTER
+    # HTML / WEBGL ENGINE DENGAN OMGIF + SPRITE SHEET GENERATOR
     html_png_shader_code = f"""
     <!DOCTYPE html>
     <html>
@@ -217,13 +216,18 @@ if uploaded_file is not None:
             body {{ margin: 0; overflow: hidden; background: #0b0712; font-family: sans-serif; text-align: center; color: white; }}
             #container {{ display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }}
             canvas {{ width: 320px; height: 320px; display: block; image-rendering: pixelated; margin-bottom: 12px; border: 1px solid #3a1c5d; border-radius: 8px; background: #110822; }}
+            .btn-group {{ display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }}
             .btn {{
                 background: linear-gradient(135deg, #8a2be2, #4b0082);
                 color: white; border: 1px solid #d4a5ff; border-radius: 8px;
-                padding: 10px 20px; font-weight: bold; cursor: pointer; font-size: 14px;
+                padding: 10px 16px; font-weight: bold; cursor: pointer; font-size: 13px;
                 transition: all 0.3s ease;
             }}
-            .btn:hover {{ background: linear-gradient(135deg, #a34bfb, #6a0ded); box-shadow: 0 0 12px rgba(163, 75, 251, 0.6); }}
+            .btn-sheet {{
+                background: linear-gradient(135deg, #2b8ae2, #004b82);
+                border-color: #a5d4ff;
+            }}
+            .btn:hover {{ filter: brightness(1.2); box-shadow: 0 0 12px rgba(163, 75, 251, 0.6); }}
             #status {{ margin-top: 10px; font-size: 13px; color: #a3f3ff; font-weight: bold; }}
         </style>
 
@@ -233,16 +237,18 @@ if uploaded_file is not None:
     <body>
         <div id="container">
             <canvas id="canvas"></canvas>
-            <div>
-                <button id="recBtn" class="btn" onclick="startRecording()">⚡ Rekam & Buat Fast GIF ({gif_duration}s @ {gif_fps}fps)</button>
+            <div class="btn-group">
+                <button id="recBtn" class="btn" onclick="startRecording('gif')">⚡ Download GIF ({gif_duration}s)</button>
+                <button id="sheetBtn" class="btn btn-sheet" onclick="startRecording('sheet')">🖼️ Download Sprite Sheet PNG</button>
             </div>
-            <div id="status">Tampilan Real-time (Klik tombol di atas untuk mengunduh GIF)</div>
+            <div id="status">Tampilan Real-time (Pilih format unduhan di atas)</div>
         </div>
 
         <script>
             const canvas = document.getElementById('canvas');
             const statusDiv = document.getElementById('status');
             const recBtn = document.getElementById('recBtn');
+            const sheetBtn = document.getElementById('sheetBtn');
 
             const renderer = new THREE.WebGLRenderer({{ canvas: canvas, antialias: true, alpha: true, preserveDrawingBuffer: true }});
             renderer.setSize(320, 320);
@@ -252,8 +258,10 @@ if uploaded_file is not None:
             const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
             let isRecording = false;
+            let recordMode = 'gif';
             let recordDuration = {gif_duration};
             let fps = {gif_fps};
+            let sheetCols = {sheet_cols};
             let frameCount = recordDuration * fps;
             let recordedFrames = [];
             let simTime = 0;
@@ -299,7 +307,6 @@ if uploaded_file is not None:
 
                 function animate() {{
                     requestAnimationFrame(animate);
-                    
                     if (!isRecording) {{
                         simTime += 0.03;
                         uniforms.u_time.value = simTime;
@@ -325,21 +332,28 @@ if uploaded_file is not None:
                             recordedFrames.push(pixels);
 
                             currentFrame++;
-                            statusDiv.innerText = "⚡ Perekaman GPU Dual-Shader: " + currentFrame + " / " + frameCount + " Frame";
+                            statusDiv.innerText = "⚡ Perekaman GPU: " + currentFrame + " / " + frameCount + " Frame";
                             setTimeout(captureNext, 10);
                         }} else {{
-                            statusDiv.innerText = "⚙️ Mengompresi GIF Dual-Shader... Mohon tunggu.";
-                            setTimeout(compileGIF, 50);
+                            if (recordMode === 'gif') {{
+                                statusDiv.innerText = "⚙️ Mengompresi GIF... Mohon tunggu.";
+                                setTimeout(compileGIF, 50);
+                            }} else {{
+                                statusDiv.innerText = "⚙️ Menyusun Sprite Sheet PNG...";
+                                setTimeout(compileSpriteSheet, 50);
+                            }}
                         }}
                     }}
                     captureNext();
                 }};
             }});
 
-            function startRecording() {{
+            function startRecording(mode) {{
                 if (isRecording) return;
                 isRecording = true;
+                recordMode = mode;
                 recBtn.disabled = true;
+                sheetBtn.disabled = true;
                 statusDiv.innerText = "⚡ Memulai Perekaman...";
                 window.processRecording();
             }}
@@ -362,44 +376,70 @@ if uploaded_file is not None:
                 for (let f = 0; f < recordedFrames.length; f++) {{
                     let pixels = recordedFrames[f];
                     let indexedPixels = new Uint8Array(width * height);
-                    
                     for (let y = 0; y < height; y++) {{
                         for (let x = 0; x < width; x++) {{
                             let srcIdx = ((height - 1 - y) * width + x) * 4;
                             let dstIdx = y * width + x;
-                            
-                            let r = pixels[srcIdx];
-                            let g = pixels[srcIdx + 1];
-                            let b = pixels[srcIdx + 2];
-                            
-                            let rIdx = Math.min(7, Math.floor(r / 32));
-                            let gIdx = Math.min(7, Math.floor(g / 32));
-                            let bIdx = Math.min(3, Math.floor(b / 64));
-                            
-                            indexedPixels[dstIdx] = (rIdx * 32) + (gIdx * 4) + bIdx;
+                            indexedPixels[dstIdx] = (Math.min(7, Math.floor(pixels[srcIdx] / 32)) * 32) + 
+                                                   (Math.min(7, Math.floor(pixels[srcIdx + 1] / 32)) * 4) + 
+                                                   Math.min(3, Math.floor(pixels[srcIdx + 2] / 64));
                         }}
                     }}
-                    
-                    gifWriter.addFrame(0, 0, width, height, indexedPixels, {{
-                        palette: palette,
-                        delay: Math.round(100 / fps)
-                    }});
+                    gifWriter.addFrame(0, 0, width, height, indexedPixels, {{ palette: palette, delay: Math.round(100 / fps) }});
                 }}
 
                 let realLen = gifWriter.end();
-                let finalBlob = new Blob([gifBuffer.subarray(0, realLen)], {{ type: 'image/gif' }});
-                let downloadUrl = URL.createObjectURL(finalBlob);
-                
+                downloadFile(new Blob([gifBuffer.subarray(0, realLen)], {{ type: 'image/gif' }}), "Terraria_Dual_Shader.gif");
+            }}
+
+            function compileSpriteSheet() {{
+                const frameW = 320;
+                const frameH = 320;
+                const cols = sheetCols;
+                const rows = Math.ceil(frameCount / cols);
+
+                let sheetCanvas = document.createElement('canvas');
+                sheetCanvas.width = frameW * cols;
+                sheetCanvas.height = frameH * rows;
+                let ctx = sheetCanvas.getContext('2d');
+
+                for (let f = 0; f < recordedFrames.length; f++) {{
+                    let col = f % cols;
+                    let row = Math.floor(f / cols);
+                    let pixels = recordedFrames[f];
+
+                    let imgData = ctx.createImageData(frameW, frameH);
+                    for (let y = 0; y < frameH; y++) {{
+                        for (let x = 0; x < frameW; x++) {{
+                            let srcIdx = ((frameH - 1 - y) * frameW + x) * 4;
+                            let dstIdx = (y * frameW + x) * 4;
+                            imgData.data[dstIdx] = pixels[srcIdx];
+                            imgData.data[dstIdx + 1] = pixels[srcIdx + 1];
+                            imgData.data[dstIdx + 2] = pixels[srcIdx + 2];
+                            imgData.data[dstIdx + 3] = pixels[srcIdx + 3];
+                        }}
+                    }}
+                    ctx.putImageData(imgData, col * frameW, row * frameH);
+                }}
+
+                sheetCanvas.toBlob(function(blob) {{
+                    downloadFile(blob, "Terraria_Sprite_Sheet.png");
+                }}, 'image/png');
+            }}
+
+            function downloadFile(blob, filename) {{
+                let downloadUrl = URL.createObjectURL(blob);
                 let a = document.createElement('a');
                 a.href = downloadUrl;
-                a.download = "Terraria_Dual_Shader_FX.gif";
+                a.download = filename;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
 
                 isRecording = false;
                 recBtn.disabled = false;
-                statusDiv.innerText = "✅ GIF Dual-Shader Berhasil Diunduh!";
+                sheetBtn.disabled = false;
+                statusDiv.innerText = "✅ File " + filename + " Berhasil Diunduh!";
             }}
         </script>
     </body>
@@ -407,9 +447,9 @@ if uploaded_file is not None:
     """
 
     with col_view:
-        st.subheader("📺 Hasil Visual Dual Shader & Fast GIF Generator")
+        st.subheader("📺 Hasil Visual Dual Shader & Exporter")
         components.html(html_png_shader_code, height=520)
 
 else:
     with col_view:
-        st.info("👈 Silakan unggah gambar PNG transparan di menu sebelah kiri untuk memulai studio & mengunduh GIF!")
+        st.info("👈 Silakan unggah gambar PNG transparan di menu sebelah kiri untuk memulai studio & mengunduh GIF / Sprite Sheet!")
