@@ -4,9 +4,9 @@ from PIL import Image
 import io
 import base64
 
-st.set_page_config(page_title="2D PNG Shader Studio v3.2 (Fixed Display)", layout="wide")
+st.set_page_config(page_title="2D PNG Shader Studio v3.3 Pro", layout="wide")
 
-st.title("🖼️ Custom PNG Sprite .FX Shader Studio v3.2")
+st.title("🖼️ Custom PNG Sprite .FX Shader Studio v3.3")
 st.caption("Unggah gambar PNG transparan, eksplorasi **10 FX Shader Pro**, dan rekam GIF secara instan!")
 
 # ==========================================
@@ -50,7 +50,7 @@ with col_ctrl:
     st.markdown("---")
     st.subheader("🎬 3. Rekam GIF Fast")
     gif_duration = st.slider("Durasi Rekaman GIF (Detik):", 1, 5, 2)
-    gif_fps = st.select_slider("Frame Rate (FPS):", options=[12, 15, 20], value=15)
+    gif_fps = st.select_slider("Frame Rate (FPS):", options=[10, 12, 15, 20], value=15)
 
 # Convert Color HEX to RGB (0.0 - 1.0)
 color_hex_clean = fx_color.lstrip('#')
@@ -263,7 +263,7 @@ if uploaded_file is not None:
         }
     """
 
-    # HTML / WEBGL FIXED DISPLAY & GIF ENGINE
+    # HTML / WEBGL FIXED DISPLAY ENGINE DENGAN OMGIF EXPORTER
     html_png_shader_code = f"""
     <!DOCTYPE html>
     <html>
@@ -283,7 +283,7 @@ if uploaded_file is not None:
         </style>
 
         <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/build/CCapture.all.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/omggif@1.0.10/omggif.min.js"></script>
     </head>
     <body>
         <div id="container">
@@ -306,10 +306,12 @@ if uploaded_file is not None:
             const scene = new THREE.Scene();
             const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-            let capturer = null;
             let isRecording = false;
             let recordDuration = {gif_duration};
-            let startTime = 0;
+            let fps = {gif_fps};
+            let frameCount = recordDuration * fps;
+            let recordedFrames = [];
+            let simTime = 0;
 
             const loader = new THREE.TextureLoader();
             loader.load('{img_data_url}', function(texture) {{
@@ -339,45 +341,109 @@ if uploaded_file is not None:
                 const mesh = new THREE.Mesh(geometry, material);
                 scene.add(mesh);
 
-                let simTime = 0;
                 function animate() {{
                     requestAnimationFrame(animate);
                     
-                    simTime += 0.03;
-                    uniforms.u_time.value = simTime;
-                    renderer.render(scene, camera);
-
-                    if (isRecording && capturer) {{
-                        capturer.capture(canvas);
-                        let elapsed = (Date.now() - startTime) / 1000;
-                        statusDiv.innerText = "⚡ Perekaman GPU: " + elapsed.toFixed(1) + "s / " + recordDuration + "s";
-                        
-                        if (elapsed >= recordDuration) {{
-                            isRecording = false;
-                            statusDiv.innerText = "⚙️ Mengompresi GIF... Mohon tunggu sebentar.";
-                            recBtn.disabled = false;
-                            capturer.stop();
-                            capturer.save(function(blob) {{
-                                statusDiv.innerText = "✅ GIF Berhasil Diunduh!";
-                            }});
-                        }}
+                    if (!isRecording) {{
+                        simTime += 0.03;
+                        uniforms.u_time.value = simTime;
+                        renderer.render(scene, camera);
                     }}
                 }}
                 animate();
+
+                window.processRecording = function() {{
+                    let currentFrame = 0;
+                    recordedFrames = [];
+                    let deltaT = 0.05;
+
+                    function captureNext() {{
+                        if (currentFrame < frameCount) {{
+                            simTime += deltaT;
+                            uniforms.u_time.value = simTime;
+                            renderer.render(scene, camera);
+
+                            let gl = renderer.getContext();
+                            let pixels = new Uint8Array(320 * 320 * 4);
+                            gl.readPixels(0, 0, 320, 320, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+                            recordedFrames.push(pixels);
+
+                            currentFrame++;
+                            statusDiv.innerText = "⚡ Perekaman GPU: " + currentFrame + " / " + frameCount + " Frame";
+                            setTimeout(captureNext, 10);
+                        }} else {{
+                            statusDiv.innerText = "⚙️ Mengompresi GIF... Mohon tunggu.";
+                            setTimeout(compileGIF, 50);
+                        }}
+                    }}
+                    captureNext();
+                }};
             }});
 
             function startRecording() {{
-                capturer = new CCapture({{
-                    format: 'gif',
-                    workersPath: 'https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/src/',
-                    framerate: {gif_fps},
-                    quality: 10
-                }});
+                if (isRecording) return;
                 isRecording = true;
                 recBtn.disabled = true;
-                startTime = Date.now();
                 statusDiv.innerText = "⚡ Memulai Perekaman...";
-                capturer.start();
+                window.processRecording();
+            }}
+
+            function compileGIF() {{
+                const width = 320;
+                const height = 320;
+                let gifBuffer = new Uint8Array(width * height * frameCount * 5);
+                let gifWriter = new omggif.GifWriter(gifBuffer, width, height, {{ loop: 0 }});
+
+                let palette = [];
+                for (let r = 0; r < 8; r++) {{
+                    for (let g = 0; g < 8; g++) {{
+                        for (let b = 0; b < 4; b++) {{
+                            palette.push((r * 36 << 16) | (g * 36 << 8) | (b * 85));
+                        }}
+                    }}
+                }}
+
+                for (let f = 0; f < recordedFrames.length; f++) {{
+                    let pixels = recordedFrames[f];
+                    let indexedPixels = new Uint8Array(width * height);
+                    
+                    for (let y = 0; y < height; y++) {{
+                        for (let x = 0; x < width; x++) {{
+                            let srcIdx = ((height - 1 - y) * width + x) * 4;
+                            let dstIdx = y * width + x;
+                            
+                            let r = pixels[srcIdx];
+                            let g = pixels[srcIdx + 1];
+                            let b = pixels[srcIdx + 2];
+                            
+                            let rIdx = Math.min(7, Math.floor(r / 32));
+                            let gIdx = Math.min(7, Math.floor(g / 32));
+                            let bIdx = Math.min(3, Math.floor(b / 64));
+                            
+                            indexedPixels[dstIdx] = (rIdx * 32) + (gIdx * 4) + bIdx;
+                        }}
+                    }}
+                    
+                    gifWriter.addFrame(0, 0, width, height, indexedPixels, {{
+                        palette: palette,
+                        delay: Math.round(100 / fps)
+                    }});
+                }}
+
+                let realLen = gifWriter.end();
+                let finalBlob = new Blob([gifBuffer.subarray(0, realLen)], {{ type: 'image/gif' }});
+                let downloadUrl = URL.createObjectURL(finalBlob);
+                
+                let a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = "Terraria_Shader_FX.gif";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                isRecording = false;
+                recBtn.disabled = false;
+                statusDiv.innerText = "✅ GIF Berhasil Diunduh!";
             }}
         </script>
     </body>
