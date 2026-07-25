@@ -46,8 +46,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚔️ Terraria Sprite Master Studio v14.2")
-st.caption("Studio All-in-One: **Sprite Recoloring**, **GIF Animation**, & **Custom Sprite Sheet Generator**.")
+st.title("⚔️ Terraria Sprite Master Studio v15.0")
+st.caption("Studio All-in-One: **Extended Texture Engine (15 Textures)**, **Sprite Recoloring**, & **Sprite Sheet Generator**.")
 
 # ==========================================
 # 2. PRESET PALET WARNA LENGKAP & MAPPING
@@ -94,7 +94,7 @@ PRESETS = {
     'shroomite': {'shadow': '#000a1a', 'mid': '#0055ff', 'glow': '#00e1ff'}
 }
 
-# Session State Setup (Kunci Widget)
+# Session State Setup
 if 'shadow_picker' not in st.session_state: st.session_state.shadow_picker = "#080214"
 if 'mid_picker' not in st.session_state: st.session_state.mid_picker = "#AA19F5"
 if 'glow_picker' not in st.session_state: st.session_state.glow_picker = "#FF78FF"
@@ -152,16 +152,23 @@ with st.sidebar.expander("🎛️ 4. Filter Foto & Adjustment", expanded=False):
     brightness = st.slider("Brightness", 0.5, 2.0, 1.0, 0.05)
     contrast = st.slider("Contrast", 0.5, 2.0, 1.0, 0.05)
 
-with st.sidebar.expander("🔀 5. Textures & 3D Shading", expanded=False):
+with st.sidebar.expander("🔀 5. Textures & 3D Shading (15 Types)", expanded=False):
     TEX_OPTIONS = [
         ('Smooth Klasik (Tanpa Tekstur)', 'smooth'),
-        ('💎 Crystal Facets', 'crystal'),
-        ('🪨 Stone Grain', 'stone'),
-        ('✨ Metallic Sparkle', 'sparkle'),
-        ('🌋 Magma / Lava Veins', 'veins'),
-        ('🔮 Obsidian Glass Slits', 'obsidian'),
-        ('🌿 Organic Moss / Spores', 'moss'),
-        ('🌌 Cosmic Swirl', 'cosmic')
+        ('💎 Crystal Facets (Faset Kristal)', 'crystal'),
+        ('🪨 Stone Grain (Batuan Alami)', 'stone'),
+        ('✨ Metallic Sparkle (Kilauan Logam)', 'sparkle'),
+        ('🌋 Magma / Lava Veins (Urat Lava)', 'veins'),
+        ('🔮 Obsidian Glass Slits (Kaca Striasi)', 'obsidian'),
+        ('🌿 Organic Moss / Spores (Spora/Lumut)', 'moss'),
+        ('🌌 Cosmic Swirl (Pusaran Nebula)', 'cosmic'),
+        ('📜 Runic Glyphs (Ukiran Sihir/Rune)', 'runic'),
+        ('🐉 Dragon Scales (Sisik Naga/Reptil)', 'scale'),
+        ('🪵 Wood Grain (Serat Kayu Alami)', 'wood'),
+        ('🍯 Honeycomb (Sarang Lebah/Hex)', 'honey'),
+        ('👾 Cyber Glitch (Piksel Digital)', 'glitch'),
+        ('🟢 Slime Bubbles (Gelembung Lendir)', 'slime'),
+        ('❄️ Frost Shards (Kristal Es Sharp)', 'frost')
     ]
     tex_primary = st.selectbox("Tekstur Utama:", options=TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
     tex_secondary = st.selectbox("Tekstur Kedua:", options=[('Tidak Ada', 'none')] + TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
@@ -196,6 +203,7 @@ def add_border_to_image(img_rgba, color=(0,0,0,255), thickness=1):
     border_img.putalpha(mask)
     return Image.alpha_composite(border_img, img_rgba)
 
+# GENERATOR TEXTURE PROSEDURAL DENGAN 15 MODE
 def get_single_texture_map(height, width, tex_type, intensity):
     if tex_type in ['smooth', 'none'] or intensity == 0:
         return np.zeros((height, width), dtype=np.float32)
@@ -224,6 +232,42 @@ def get_single_texture_map(height, width, tex_type, intensity):
         wave2 = np.cos(y_indices * 0.25 + np.sin(x_indices * 0.1) * 2.5)
         vein = np.abs(wave1 + wave2)
         tex = np.where(vein < 0.35, (0.35 - vein) * 2.2, -0.15) * intensity
+    elif tex_type == 'obsidian':
+        diag = np.sin((x_indices * 0.4 + y_indices * 0.6))
+        tex = np.where(diag > 0.3, 0.4, -0.25) * intensity
+    elif tex_type == 'moss':
+        blob = np.sin(x_indices * 0.18) * np.cos(y_indices * 0.18) + np.sin(x_indices * 0.08 + y_indices * 0.08)
+        tex = np.where(blob > 0.3, (blob - 0.3) * 0.9, -0.1) * intensity
+    elif tex_type == 'cosmic':
+        center_y, center_x = height / 2.0, width / 2.0
+        r = np.sqrt((x_indices - center_x)**2 + (y_indices - center_y)**2)
+        angle = np.arctan2(y_indices - center_y, x_indices - center_x)
+        tex = np.sin(angle * 3.0 + r * 0.2) * 0.5 * intensity
+    elif tex_type == 'runic':
+        grid_mask = ((x_indices % 4 == 0) | (y_indices % 4 == 0)).astype(np.float32)
+        hash_rune = np.sin((x_indices // 4) * 12.9898 + (y_indices // 4) * 78.233) * 43758.5453
+        rune_pattern = ((hash_rune - np.floor(hash_rune)) > 0.55).astype(np.float32)
+        tex = (grid_mask * rune_pattern * 0.6 - 0.1) * intensity
+    elif tex_type == 'scale':
+        s_wave = np.sin(x_indices * 0.5 + (y_indices % 4) * 0.8) * np.cos(y_indices * 0.4)
+        tex = np.where(s_wave > 0.2, 0.4, -0.2) * intensity
+    elif tex_type == 'wood':
+        ring = np.sin(np.sqrt((x_indices - width*0.5)**2 + (y_indices - height*0.5)**2) * 0.4 + np.sin(y_indices * 0.1) * 2.0)
+        tex = ring * 0.35 * intensity
+    elif tex_type == 'honey':
+        hex_wave = np.sin(x_indices * 0.4) + np.sin(x_indices * 0.2 + y_indices * 0.35) + np.sin(x_indices * 0.2 - y_indices * 0.35)
+        tex = np.where(hex_wave > 1.2, 0.5, -0.2) * intensity
+    elif tex_type == 'glitch':
+        block_y, block_x = y_indices // 2, x_indices // 4
+        g_noise = np.sin(block_y * 45.12 + block_x * 91.34) * 43758.5453
+        tex = np.where((g_noise - np.floor(g_noise)) > 0.7, 0.6, -0.15) * intensity
+    elif tex_type == 'slime':
+        blobs = np.sin(x_indices * 0.25) * np.cos(y_indices * 0.25) + np.cos(x_indices * 0.1 + y_indices * 0.1)
+        tex = np.where(blobs > 0.5, 0.45, -0.1) * intensity
+    elif tex_type == 'frost':
+        shard1 = np.abs(np.sin(x_indices * 0.5 + y_indices * 0.5))
+        shard2 = np.abs(np.cos(x_indices * 0.5 - y_indices * 0.5))
+        tex = (np.maximum(shard1, shard2) - 0.5) * 0.8 * intensity
     else:
         tex = np.zeros((height, width), dtype=np.float32)
 
