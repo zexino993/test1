@@ -4,10 +4,10 @@ from PIL import Image
 import io
 import base64
 
-st.set_page_config(page_title="2D PNG Shader Studio v3.1 (Fast GIF)", layout="wide")
+st.set_page_config(page_title="2D PNG Shader Studio v3.2 (Fixed Display)", layout="wide")
 
-st.title("🖼️ Custom PNG Sprite .FX Shader Studio v3.1")
-st.caption("Unggah gambar PNG transparan, eksplorasi **10 FX Shader Pro**, dan rekam GIF dengan **Fast Compression Engine**!")
+st.title("🖼️ Custom PNG Sprite .FX Shader Studio v3.2")
+st.caption("Unggah gambar PNG transparan, eksplorasi **10 FX Shader Pro**, dan rekam GIF secara instan!")
 
 # ==========================================
 # 1. INPUT FILE & SHADER CONTROLS
@@ -48,7 +48,7 @@ with col_ctrl:
     )
 
     st.markdown("---")
-    st.subheader("🎬 3. Rekam Fast GIF")
+    st.subheader("🎬 3. Rekam GIF Fast")
     gif_duration = st.slider("Durasi Rekaman GIF (Detik):", 1, 5, 2)
     gif_fps = st.select_slider("Frame Rate (FPS):", options=[12, 15, 20], value=15)
 
@@ -263,7 +263,7 @@ if uploaded_file is not None:
         }
     """
 
-    # HTML / WEBGL / FAST CCAPTURE EMBED ENGINE
+    # HTML / WEBGL FIXED DISPLAY & GIF ENGINE
     html_png_shader_code = f"""
     <!DOCTYPE html>
     <html>
@@ -271,7 +271,7 @@ if uploaded_file is not None:
         <style>
             body {{ margin: 0; overflow: hidden; background: #0b0712; font-family: sans-serif; text-align: center; color: white; }}
             #container {{ display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }}
-            canvas {{ max-width: 90%; max-height: 70vh; display: block; image-rendering: pixelated; margin-bottom: 15px; }}
+            canvas {{ width: 320px; height: 320px; display: block; image-rendering: pixelated; margin-bottom: 12px; border: 1px solid #3a1c5d; border-radius: 8px; background: #110822; }}
             .btn {{
                 background: linear-gradient(135deg, #8a2be2, #4b0082);
                 color: white; border: 1px solid #d4a5ff; border-radius: 8px;
@@ -299,27 +299,20 @@ if uploaded_file is not None:
             const statusDiv = document.getElementById('status');
             const recBtn = document.getElementById('recBtn');
 
-            const renderer = new THREE.WebGLRenderer({{ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true }});
-            renderer.setPixelRatio(1); // Set ke 1 untuk kecepatan kompresi maksimal
+            const renderer = new THREE.WebGLRenderer({{ canvas: canvas, antialias: true, alpha: true, preserveDrawingBuffer: true }});
+            renderer.setSize(320, 320);
+            renderer.setPixelRatio(1);
 
             const scene = new THREE.Scene();
             const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-            // MULTI-THREADED FAST CCAPTURE SETUP
-            const capturer = new CCapture({{
-                format: 'gif',
-                workersPath: 'https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/src/',
-                framerate: {gif_fps},
-                quality: 6, // Mengurangi beban rendering tanpa mengorbankan kualitas visual
-                workers: 4  # Menggunakan 4 CPU Worker bersamaan
-            }});
-
+            let capturer = null;
             let isRecording = false;
             let recordDuration = {gif_duration};
             let startTime = 0;
 
             const loader = new THREE.TextureLoader();
-            loader.load('{img_data_url}', (texture) => {{
+            loader.load('{img_data_url}', function(texture) {{
                 texture.minFilter = THREE.NearestFilter;
                 texture.magFilter = THREE.NearestFilter;
 
@@ -346,9 +339,6 @@ if uploaded_file is not None:
                 const mesh = new THREE.Mesh(geometry, material);
                 scene.add(mesh);
 
-                // Ukuran canvas perekaman 256x256 px agar kompresi kilat
-                renderer.setSize(256, 256);
-
                 let simTime = 0;
                 function animate() {{
                     requestAnimationFrame(animate);
@@ -357,17 +347,17 @@ if uploaded_file is not None:
                     uniforms.u_time.value = simTime;
                     renderer.render(scene, camera);
 
-                    if (isRecording) {{
+                    if (isRecording && capturer) {{
                         capturer.capture(canvas);
                         let elapsed = (Date.now() - startTime) / 1000;
-                        statusDiv.innerText = "⚡ Perekaman Multi-Thread CPU: " + elapsed.toFixed(1) + "s / " + recordDuration + "s";
+                        statusDiv.innerText = "⚡ Perekaman GPU: " + elapsed.toFixed(1) + "s / " + recordDuration + "s";
                         
                         if (elapsed >= recordDuration) {{
                             isRecording = false;
-                            statusDiv.innerText = "⚙️ Mengompresi GIF Kilat... Selesai dalam hitungan detik!";
+                            statusDiv.innerText = "⚙️ Mengompresi GIF... Mohon tunggu sebentar.";
                             recBtn.disabled = false;
                             capturer.stop();
-                            capturer.save((blob) => {{
+                            capturer.save(function(blob) {{
                                 statusDiv.innerText = "✅ GIF Berhasil Diunduh!";
                             }});
                         }}
@@ -377,10 +367,16 @@ if uploaded_file is not None:
             }});
 
             function startRecording() {{
+                capturer = new CCapture({{
+                    format: 'gif',
+                    workersPath: 'https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/src/',
+                    framerate: {gif_fps},
+                    quality: 10
+                }});
                 isRecording = true;
                 recBtn.disabled = true;
                 startTime = Date.now();
-                statusDiv.innerText = "⚡ Memulai Perekaman Multi-Thread...";
+                statusDiv.innerText = "⚡ Memulai Perekaman...";
                 capturer.start();
             }}
         </script>
@@ -390,7 +386,7 @@ if uploaded_file is not None:
 
     with col_view:
         st.subheader("📺 Hasil Visual & Fast GIF Generator")
-        components.html(html_png_shader_code, height=580)
+        components.html(html_png_shader_code, height=520)
 
 else:
     with col_view:
