@@ -46,8 +46,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚔️ Terraria Sprite Master Studio v15.0")
-st.caption("Studio All-in-One: **Extended Texture Engine (15 Textures)**, **Sprite Recoloring**, & **Sprite Sheet Generator**.")
+st.title("⚔️ Terraria Sprite Master Studio v16.0")
+st.caption("Studio All-in-One: **Directional Pulse Waves**, **15 Textures**, & **Custom Sprite Sheet Generator**.")
 
 # ==========================================
 # 2. PRESET PALET WARNA LENGKAP & MAPPING
@@ -176,9 +176,13 @@ with st.sidebar.expander("🔀 5. Textures & 3D Shading (15 Types)", expanded=Fa
     tex_intensity = st.slider("Kekuatan Tekstur", 0.0, 1.0, 0.35, 0.05)
     depth_mult = st.slider("Intensitas 3D Depth", 0.5, 3.0, 1.5, 0.1)
 
-with st.sidebar.expander("💡 6. Glowmask & Pulse Settings", expanded=False):
+with st.sidebar.expander("💡 6. Glowmask & Directional Pulse Settings", expanded=True):
     threshold = st.slider("Sensitivitas Glow Area", 0.1, 0.9, 0.45, 0.02)
     pulse_intensity = st.slider("Kekuatan Denyut Pulse", 0.1, 1.0, 0.5, 0.05)
+    pulse_direction = st.selectbox(
+        "Arah Denyut Pulse (Pulse Direction):",
+        ["Seperti Biasa (Uniform)", "Dari Atas ⬇️", "Dari Bawah ⬆️", "Dari Kiri ➡️", "Dari Kanan ⬅️"]
+    )
 
 # ==========================================
 # 4. HELPER & CORE ENGINE FUNCTIONS
@@ -203,7 +207,6 @@ def add_border_to_image(img_rgba, color=(0,0,0,255), thickness=1):
     border_img.putalpha(mask)
     return Image.alpha_composite(border_img, img_rgba)
 
-# GENERATOR TEXTURE PROSEDURAL DENGAN 15 MODE
 def get_single_texture_map(height, width, tex_type, intensity):
     if tex_type in ['smooth', 'none'] or intensity == 0:
         return np.zeros((height, width), dtype=np.float32)
@@ -343,6 +346,43 @@ def render_studio_all(arr, extra_hue=0):
 
     return out_img, glow_img, lum, glow_alpha
 
+# HELPER GENERATOR FRAME PULSE BERARAH (DIRECTIONAL PULSE GENERATOR)
+def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensity, p_direction):
+    base_rgb = np.array(out_img, dtype=np.float32)[:, :, :3]
+    alpha_arr = np.array(out_img)[:, :, 3:]
+    glow_mask_norm = np.expand_dims((glow_alpha.astype(np.float32) / 255.0), axis=-1)
+    height, width = glow_alpha.shape
+
+    t = frame_idx / float(total_frames)
+
+    if p_direction == "Dari Atas ⬇️":
+        y_indices, _ = np.indices((height, width), dtype=np.float32)
+        y_norm = y_indices / max(1.0, height - 1.0)
+        pulse_val = (np.sin(2.0 * np.pi * (t - y_norm)) + 1.0) * 0.5
+    elif p_direction == "Dari Bawah ⬆️":
+        y_indices, _ = np.indices((height, width), dtype=np.float32)
+        y_norm = y_indices / max(1.0, height - 1.0)
+        pulse_val = (np.sin(2.0 * np.pi * (t - (1.0 - y_norm))) + 1.0) * 0.5
+    elif p_direction == "Dari Kiri ➡️":
+        _, x_indices = np.indices((height, width), dtype=np.float32)
+        x_norm = x_indices / max(1.0, width - 1.0)
+        pulse_val = (np.sin(2.0 * np.pi * (t - x_norm)) + 1.0) * 0.5
+    elif p_direction == "Dari Kanan ⬅️":
+        _, x_indices = np.indices((height, width), dtype=np.float32)
+        x_norm = x_indices / max(1.0, width - 1.0)
+        pulse_val = (np.sin(2.0 * np.pi * (t - (1.0 - x_norm))) + 1.0) * 0.5
+    else:  # "Seperti Biasa (Uniform)"
+        pulse_val = (math.sin(2.0 * math.pi * t) + 1.0) * 0.5
+
+    if isinstance(pulse_val, np.ndarray):
+        pulse_val = np.expand_dims(pulse_val, axis=-1)
+
+    pulse_factor = pulse_val * p_intensity
+    boosted_rgb = base_rgb + (base_rgb * 0.6 + 60.0) * glow_mask_norm * pulse_factor
+    boosted_rgb = np.clip(boosted_rgb, 0, 255).astype(np.uint8)
+
+    return Image.fromarray(np.dstack((boosted_rgb, alpha_arr.astype(np.uint8))), mode="RGBA")
+
 def create_spritesheet(frames, cols, padding=0):
     if not frames: return None
     n = len(frames)
@@ -438,15 +478,8 @@ if uploaded_file is not None:
             sheet_frames = []
             
             if sheet_anim_type == "Glow Pulse Frames":
-                base_rgb = np.array(out_img, dtype=np.float32)[:, :, :3]
-                alpha_arr = np.array(out_img)[:, :, 3:]
-                glow_mask_norm = np.expand_dims((glow_alpha.astype(np.float32) / 255.0), axis=-1)
-
                 for i in range(frame_count):
-                    pulse_factor = (math.sin(2 * math.pi * i / frame_count) + 1.0) * 0.5 * pulse_intensity
-                    boosted_rgb = base_rgb + (base_rgb * 0.6 + 60.0) * glow_mask_norm * pulse_factor
-                    boosted_rgb = np.clip(boosted_rgb, 0, 255).astype(np.uint8)
-                    f_img = Image.fromarray(np.dstack((boosted_rgb, alpha_arr.astype(np.uint8))), mode="RGBA")
+                    f_img = generate_pulse_frame(out_img, glow_alpha, i, frame_count, pulse_intensity, pulse_direction)
                     sheet_frames.append(f_img)
                     
             elif sheet_anim_type == "RGB Rainbow Hue Cycle":
@@ -471,7 +504,7 @@ if uploaded_file is not None:
         if 'spritesheet_bytes' in st.session_state:
             st.divider()
             sw, sh = st.session_state['spritesheet_size']
-            st.write(f"📐 **Ukuran Sprite Sheet:** `{sw} x {sh} pixels`")
+            st.write(f"📐 **Ukuran Sprite Sheet:** `{sw} x {sh} pixels` | Arah: **{pulse_direction}**")
             
             ss_preview_img = Image.open(io.BytesIO(st.session_state['spritesheet_bytes']))
             st.image(ss_preview_img.resize((sw * max(1, zoom//2), sh * max(1, zoom//2)), Image.NEAREST))
@@ -489,24 +522,17 @@ if uploaded_file is not None:
         gif_col1, gif_col2 = st.columns(2)
 
         with gif_col1:
-            st.write("**1. Glow Pulse Animation**")
+            st.write(f"**1. Glow Pulse Animation ({pulse_direction})**")
             if st.button("Preview Glow Pulse GIF 🎬", key="btn_pulse_prev", use_container_width=True):
-                base_rgb = np.array(out_img, dtype=np.float32)[:, :, :3]
-                alpha_arr = np.array(out_img)[:, :, 3:]
-                glow_mask_norm = np.expand_dims((glow_alpha.astype(np.float32) / 255.0), axis=-1)
-
                 frames = []
-                for i in range(10):
-                    pulse_factor = (math.sin(2 * math.pi * i / 10) + 1.0) * 0.5 * pulse_intensity
-                    boosted_rgb = base_rgb + (base_rgb * 0.6 + 60.0) * glow_mask_norm * pulse_factor
-                    boosted_rgb = np.clip(boosted_rgb, 0, 255).astype(np.uint8)
-                    
-                    f_img = Image.fromarray(np.dstack((boosted_rgb, alpha_arr.astype(np.uint8))), mode="RGBA")
+                num_frames = 12
+                for i in range(num_frames):
+                    f_img = generate_pulse_frame(out_img, glow_alpha, i, num_frames, pulse_intensity, pulse_direction)
                     if zoom > 1: f_img = f_img.resize((w * zoom, h * zoom), Image.NEAREST)
                     frames.append(f_img)
 
                 buf_pulse = io.BytesIO()
-                frames[0].save(buf_pulse, format="GIF", save_all=True, append_images=frames[1:], duration=100, loop=0)
+                frames[0].save(buf_pulse, format="GIF", save_all=True, append_images=frames[1:], duration=90, loop=0)
                 st.session_state['pulse_gif_bytes'] = buf_pulse.getvalue()
 
             if 'pulse_gif_bytes' in st.session_state:
