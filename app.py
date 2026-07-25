@@ -46,27 +46,24 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚔️ Terraria Sprite Master Studio v13.1")
-st.caption("Studio All-in-One untuk **Semua Sprite Terraria** (Senjata, Zirah, NPC, Pet, Tile, & Aksesori).")
+st.title("⚔️ Terraria Sprite Master Studio v14.0")
+st.caption("Studio All-in-One: **Sprite Recoloring**, **GIF Animation**, & **Custom Sprite Sheet Generator**.")
 
 # ==========================================
 # 2. PRESET PALET WARNA LENGKAP
 # ==========================================
 PRESETS = {
     'manual': None,
-    # Terraria Weapons & Iconic
     'true_nights_edge': {'shadow': '#0f001e', 'mid': '#5a189a', 'glow': '#00ffcc'},
     'terra_blade': {'shadow': '#001b00', 'mid': '#2ec4b6', 'glow': '#80ff00'},
     'excalibur': {'shadow': '#2b1e00', 'mid': '#ffb703', 'glow': '#ffffff'},
     'meowmere': {'shadow': '#3a0ca3', 'mid': '#f72585', 'glow': '#4cc9f0'},
     'zenith': {'shadow': '#120024', 'mid': '#7209b7', 'glow': '#ff007f'},
     'vampire_crimson': {'shadow': '#200000', 'mid': '#d90429', 'glow': '#ff70a6'},
-    # Pastel Presets
     'pastel_cotton_candy': {'shadow': '#3a1c4d', 'mid': '#f3a6ff', 'glow': '#a3f3ff'},
     'pastel_mint': {'shadow': '#1b3b32', 'mid': '#80e8c6', 'glow': '#d1fff0'},
     'pastel_lavender': {'shadow': '#2a1a4a', 'mid': '#b39ddb', 'glow': '#f3e5f5'},
     'pastel_peach': {'shadow': '#3e1a1a', 'mid': '#ffab91', 'glow': '#ffe0b2'},
-    # Ore Presets
     'hellstone': {'shadow': '#1a0000', 'mid': '#e63900', 'glow': '#ffcc00'},
     'chlorophyte': {'shadow': '#0a2000', 'mid': '#2ecc71', 'glow': '#a3ff00'},
     'luminite': {'shadow': '#001f24', 'mid': '#00b894', 'glow': '#81ecec'},
@@ -92,7 +89,7 @@ def on_preset_change():
 # 3. SIDEBAR CONTROLS
 # ==========================================
 st.sidebar.header("📁 1. Input Sprite & Mode")
-uploaded_file = st.sidebar.file_uploader("Upload PNG Sprite / Sprite Sheet", type=["png"])
+uploaded_file = st.sidebar.file_uploader("Upload PNG Sprite / Tile", type=["png"])
 
 sprite_type = st.sidebar.selectbox(
     "Jenis Sprite:",
@@ -176,15 +173,11 @@ def apply_hue_shift(rgb_array, hue_deg):
     h_arr = (np.array(h, dtype=np.int16) + int((hue_deg / 360.0) * 255)) % 256
     return np.array(Image.merge('HSV', (Image.fromarray(h_arr.astype(np.uint8)), s, v)).convert('RGB'), dtype=np.float32)
 
-# PERBAIKAN UTAMA: Menggunakan ImageFilter.MaxFilter untuk outline dilation yang handal
 def add_border_to_image(img_rgba, color=(0,0,0,255), thickness=1):
     if thickness == 0: return img_rgba
     w, h = img_rgba.size
     alpha = img_rgba.split()[3]
-    
-    # Dilation masker alpha menggunakan MaxFilter bawaan Pillow
     mask = alpha.filter(ImageFilter.MaxFilter(thickness * 2 + 1))
-                
     border_img = Image.new("RGBA", (w, h), color)
     border_img.putalpha(mask)
     return Image.alpha_composite(border_img, img_rgba)
@@ -294,6 +287,27 @@ def render_studio_all(arr, extra_hue=0):
 
     return out_img, glow_img, lum, glow_alpha
 
+# HELPER BARU: Spritesheet Layout Canvas Generator
+def create_spritesheet(frames, cols, padding=0):
+    if not frames: return None
+    n = len(frames)
+    cols = max(1, min(cols, n))
+    rows = math.ceil(n / cols)
+    
+    fw, fh = frames[0].size
+    sheet_w = cols * fw + (cols + 1) * padding
+    sheet_h = rows * fh + (rows + 1) * padding
+    
+    sheet = Image.new("RGBA", (sheet_w, sheet_h), (0, 0, 0, 0))
+    for idx, frame in enumerate(frames):
+        r = idx // cols
+        c = idx % cols
+        x = padding + c * (fw + padding)
+        y = padding + r * (fh + padding)
+        sheet.paste(frame, (x, y))
+        
+    return sheet
+
 # ==========================================
 # 5. MAIN DASHBOARD STUDIO
 # ==========================================
@@ -311,9 +325,10 @@ if uploaded_file is not None:
     rgb_z = rgb_shift_img.resize((w * zoom, h * zoom), Image.NEAREST)
 
     # Tabs Navigation
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "🖼️ Quad-Preview Matrix", 
         "🧩 3x3 Tile Grid Test", 
+        "📊 Sprite Sheet Builder", 
         "🎬 GIF Animation Studio", 
         "💾 Export Center"
     ])
@@ -339,8 +354,87 @@ if uploaded_file is not None:
                 grid_3x3.paste(out_z, (gx * w * zoom, gy * h * zoom))
         st.image(grid_3x3)
 
+    # TAB BARU: SPRITE SHEET BUILDER
     with tab3:
-        st.subheader("🎬 GIF Animation & Sprite Sheet Studio")
+        st.subheader("📊 Custom Sprite Sheet Generator")
+        st.caption("Buat Sprite Sheet animasi berformat PNG transparan siap pakai untuk Mod Terraria / Game Engine.")
+
+        ss_col1, ss_col2 = st.columns(2)
+        with ss_col1:
+            sheet_anim_type = st.selectbox(
+                "Jenis Animasi Frame:",
+                ["Glow Pulse Frames", "RGB Rainbow Hue Cycle", "Recolor Spectrum Wave"]
+            )
+            frame_count = st.slider("Jumlah Frame Animasi:", min_value=2, max_value=20, value=8, step=1)
+            
+        with ss_col2:
+            layout_type = st.selectbox(
+                "Format Layout Sheet:",
+                ["Vertical Strip (1 Kolom - Format Terraria)", "Horizontal Strip (1 Baris)", "Custom Grid (Kolom & Baris)"]
+            )
+            if "Custom Grid" in layout_type:
+                grid_cols = st.number_input("Jumlah Kolom Grid:", min_value=1, max_value=10, value=4)
+            elif "Vertical" in layout_type:
+                grid_cols = 1
+            else:
+                grid_cols = frame_count
+
+            frame_padding = st.number_input("Jarak / Padding Antar Frame (px):", min_value=0, max_value=10, value=0)
+
+        if st.button("🚀 Generate Sprite Sheet", use_container_width=True):
+            sheet_frames = []
+            
+            if sheet_anim_type == "Glow Pulse Frames":
+                base_rgb = np.array(out_img, dtype=np.float32)[:, :, :3]
+                alpha_arr = np.array(out_img)[:, :, 3:]
+                glow_mask_norm = np.expand_dims((glow_alpha.astype(np.float32) / 255.0), axis=-1)
+
+                for i in range(frame_count):
+                    pulse_factor = (math.sin(2 * math.pi * i / frame_count) + 1.0) * 0.5 * pulse_intensity
+                    boosted_rgb = base_rgb + (base_rgb * 0.6 + 60.0) * glow_mask_norm * pulse_factor
+                    boosted_rgb = np.clip(boosted_rgb, 0, 255).astype(np.uint8)
+                    f_img = Image.fromarray(np.dstack((boosted_rgb, alpha_arr.astype(np.uint8))), mode="RGBA")
+                    sheet_frames.append(f_img)
+                    
+            elif sheet_anim_type == "RGB Rainbow Hue Cycle":
+                hue_step = 360 // frame_count
+                for i in range(frame_count):
+                    f_img, _, _, _ = render_studio_all(arr, extra_hue=(i * hue_step))
+                    sheet_frames.append(f_img)
+
+            elif sheet_anim_type == "Recolor Spectrum Wave":
+                hue_step = 180 // frame_count
+                for i in range(frame_count):
+                    f_img, _, _, _ = render_studio_all(arr, extra_hue=(i * hue_step))
+                    sheet_frames.append(f_img)
+
+            spritesheet_img = create_spritesheet(sheet_frames, cols=grid_cols, padding=frame_padding)
+            
+            # Save to Session State
+            buf_ss = io.BytesIO()
+            spritesheet_img.save(buf_ss, format="PNG")
+            st.session_state['spritesheet_bytes'] = buf_ss.getvalue()
+            st.session_state['spritesheet_size'] = spritesheet_img.size
+
+        if 'spritesheet_bytes' in st.session_state:
+            st.divider()
+            sw, sh = st.session_state['spritesheet_size']
+            st.write(f"📐 **Ukuran Sprite Sheet:** `{sw} x {sh} pixels`")
+            
+            # Magnify Sheet Preview
+            ss_preview_img = Image.open(io.BytesIO(st.session_state['spritesheet_bytes']))
+            st.image(ss_preview_img.resize((sw * max(1, zoom//2), sh * max(1, zoom//2)), Image.NEAREST))
+            
+            st.download_button(
+                "💾 Download Sprite Sheet PNG", 
+                data=st.session_state['spritesheet_bytes'], 
+                file_name="TerrariaSprite_Sheet.png", 
+                mime="image/png", 
+                use_container_width=True
+            )
+
+    with tab4:
+        st.subheader("🎬 GIF Animation Studio")
         gif_col1, gif_col2 = st.columns(2)
 
         with gif_col1:
@@ -383,9 +477,9 @@ if uploaded_file is not None:
             if 'rgb_gif_bytes' in st.session_state:
                 st.image(st.session_state['rgb_gif_bytes'])
 
-    with tab4:
+    with tab5:
         st.subheader("💾 Export Center")
-        st.write("Unduh hasil sprite dalam format PNG transparan atau GIF animasi:")
+        st.write("Unduh semua berkas hasil olahan sprite:")
         
         col_ex1, col_ex2 = st.columns(2)
         
@@ -403,6 +497,10 @@ if uploaded_file is not None:
             col_ex3.download_button("🎬 Download Glow Pulse GIF", data=st.session_state['pulse_gif_bytes'], file_name="TerrariaSprite_Pulse.gif", mime="image/gif", use_container_width=True)
         if 'rgb_gif_bytes' in st.session_state:
             col_ex4.download_button("🌈 Download RGB Cycle GIF", data=st.session_state['rgb_gif_bytes'], file_name="TerrariaSprite_RGB.gif", mime="image/gif", use_container_width=True)
+
+        if 'spritesheet_bytes' in st.session_state:
+            st.divider()
+            st.download_button("📊 Download Sprite Sheet PNG", data=st.session_state['spritesheet_bytes'], file_name="TerrariaSprite_Sheet.png", mime="image/png", use_container_width=True)
 
 else:
     st.info("👈 Silakan unggah sprite PNG (Senjata, Zirah, NPC, Tile, Pet) di sidebar kiri untuk memulai studio!")
