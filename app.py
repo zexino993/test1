@@ -4,7 +4,9 @@ import numpy as np
 from PIL import Image, ImageEnhance, ImageChops, ImageFilter
 import streamlit as st
 
-# 1. Konfigurasi Halaman Web & CSS Custom Theme UI/UX
+# ==========================================
+# 1. KONFIGURASI HALAMAN & THEME UI/UX
+# ==========================================
 st.set_page_config(
     page_title="Terraria Sprite Master Studio",
     page_icon="⚔️",
@@ -38,7 +40,7 @@ st.markdown("""
         background-color: #130b21;
         border-radius: 6px;
     }
-    .css-1r6594q, .stTab {
+    .stTab {
         font-weight: bold;
     }
 </style>
@@ -47,7 +49,9 @@ st.markdown("""
 st.title("⚔️ Terraria Sprite Master Studio v13.0")
 st.caption("Studio All-in-One untuk **Semua Sprite Terraria** (Senjata, Zirah, NPC, Pet, Tile, & Aksesori).")
 
-# 2. Preset Palet Warna Lengkap
+# ==========================================
+# 2. PRESET PALET WARNA LENGKAP
+# ==========================================
 PRESETS = {
     'manual': None,
     # Terraria Weapons & Iconic
@@ -69,7 +73,7 @@ PRESETS = {
     'shroomite': {'shadow': '#000a1a', 'mid': '#0055ff', 'glow': '#00e1ff'}
 }
 
-# Session State
+# Session State Setup
 if 'shadow_val' not in st.session_state: st.session_state.shadow_val = "#080214"
 if 'mid_val' not in st.session_state: st.session_state.mid_val = "#AA19F5"
 if 'glow_val' not in st.session_state: st.session_state.glow_val = "#FF78FF"
@@ -84,7 +88,9 @@ def on_preset_change():
         if 'pastel' in p_key:
             st.session_state.pastel_mode_val = True
 
-# 3. Sidebar UI Layout
+# ==========================================
+# 3. SIDEBAR CONTROLS
+# ==========================================
 st.sidebar.header("📁 1. Input Sprite & Mode")
 uploaded_file = st.sidebar.file_uploader("Upload PNG Sprite / Sprite Sheet", type=["png"])
 
@@ -156,7 +162,9 @@ with st.sidebar.expander("💡 6. Glowmask & Pulse Settings", expanded=False):
     threshold = st.slider("Sensitivitas Glow Area", 0.1, 0.9, 0.45, 0.02)
     pulse_intensity = st.slider("Kekuatan Denyut Pulse", 0.1, 1.0, 0.5, 0.05)
 
-# 4. Helper & Engine Functions
+# ==========================================
+# 4. HELPER & CORE ENGINE FUNCTIONS
+# ==========================================
 def hex_to_rgb(hex_str):
     hex_str = hex_str.lstrip('#')
     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
@@ -168,19 +176,19 @@ def apply_hue_shift(rgb_array, hue_deg):
     h_arr = (np.array(h, dtype=np.int16) + int((hue_deg / 360.0) * 255)) % 256
     return np.array(Image.merge('HSV', (Image.fromarray(h_arr.astype(np.uint8)), s, v)).convert('RGB'), dtype=np.float32)
 
+# PERBAIKAN: Menggunakan ImageChops.maximum
 def add_border_to_image(img_rgba, color=(0,0,0,255), thickness=1):
     if thickness == 0: return img_rgba
     w, h = img_rgba.size
     alpha = img_rgba.split()[3]
     
-    # Expand alpha mask
     mask = Image.new('L', (w, h), 0)
     for dx in range(-thickness, thickness + 1):
         for dy in range(-thickness, thickness + 1):
             if dx*dx + dy*dy <= thickness*thickness:
                 shifted = Image.new('L', (w, h), 0)
                 shifted.paste(alpha, (dx, dy))
-                mask = Image.maximum(mask, shifted)
+                mask = ImageChops.maximum(mask, shifted)
                 
     border_img = Image.new("RGBA", (w, h), color)
     border_img.putalpha(mask)
@@ -272,13 +280,13 @@ def render_studio_all(arr, extra_hue=0):
         glow_alpha = np.where((final_lum >= threshold) & (alpha_uint8 > 0), alpha_uint8, 0).astype(np.uint8)
         glow_img = Image.fromarray(np.dstack((out_rgb, glow_alpha)), mode="RGBA")
 
-    # Apply Brightness & Contrast Adjustments
+    # Brightness & Contrast
     if brightness != 1.0:
         out_img = ImageEnhance.Brightness(out_img).enhance(brightness)
     if contrast != 1.0:
         out_img = ImageEnhance.Contrast(out_img).enhance(contrast)
 
-    # Apply Outline/Border if enabled
+    # Outline / Border
     if enable_outline:
         if outline_color_mode == "Black (Terraria Classic)":
             b_color = (0, 0, 0, 255)
@@ -291,7 +299,9 @@ def render_studio_all(arr, extra_hue=0):
 
     return out_img, glow_img, lum, glow_alpha
 
-# 5. Main Dashboard Studio
+# ==========================================
+# 5. MAIN DASHBOARD STUDIO
+# ==========================================
 if uploaded_file is not None:
     orig_img = Image.open(uploaded_file).convert("RGBA")
     arr = np.array(orig_img, dtype=np.float32)
@@ -305,7 +315,7 @@ if uploaded_file is not None:
     glow_z = glow_img.resize((w * zoom, h * zoom), Image.NEAREST)
     rgb_z = rgb_shift_img.resize((w * zoom, h * zoom), Image.NEAREST)
 
-    # Navigation Tabs Studio
+    # Tabs Navigation
     tab1, tab2, tab3, tab4 = st.tabs([
         "🖼️ Quad-Preview Matrix", 
         "🧩 3x3 Tile Grid Test", 
