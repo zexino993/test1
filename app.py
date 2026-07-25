@@ -46,7 +46,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚔️ Terraria Sprite Master Studio v14.0")
+st.title("⚔️ Terraria Sprite Master Studio v14.1")
 st.caption("Studio All-in-One: **Sprite Recoloring**, **GIF Animation**, & **Custom Sprite Sheet Generator**.")
 
 # ==========================================
@@ -70,18 +70,18 @@ PRESETS = {
     'shroomite': {'shadow': '#000a1a', 'mid': '#0055ff', 'glow': '#00e1ff'}
 }
 
-# Session State Setup
-if 'shadow_val' not in st.session_state: st.session_state.shadow_val = "#080214"
-if 'mid_val' not in st.session_state: st.session_state.mid_val = "#AA19F5"
-if 'glow_val' not in st.session_state: st.session_state.glow_val = "#FF78FF"
+# Session State Setup (Direct Widget Key Management)
+if 'shadow_picker' not in st.session_state: st.session_state.shadow_picker = "#080214"
+if 'mid_picker' not in st.session_state: st.session_state.mid_picker = "#AA19F5"
+if 'glow_picker' not in st.session_state: st.session_state.glow_picker = "#FF78FF"
 if 'pastel_mode_val' not in st.session_state: st.session_state.pastel_mode_val = False
 
 def on_preset_change():
     p_key = st.session_state.preset_choice
     if p_key in PRESETS and PRESETS[p_key] is not None:
-        st.session_state.shadow_val = PRESETS[p_key]['shadow']
-        st.session_state.mid_val = PRESETS[p_key]['mid']
-        st.session_state.glow_val = PRESETS[p_key]['glow']
+        st.session_state.shadow_picker = PRESETS[p_key]['shadow']
+        st.session_state.mid_picker = PRESETS[p_key]['mid']
+        st.session_state.glow_picker = PRESETS[p_key]['glow']
         if 'pastel' in p_key:
             st.session_state.pastel_mode_val = True
 
@@ -121,9 +121,10 @@ with st.sidebar.expander("🎨 2. Presets & Warna Palette", expanded=True):
         on_change=on_preset_change
     )
     
-    shadow_color = st.color_picker("1. Shadow Celah", st.session_state.shadow_val, key="shadow_picker")
-    mid_color = st.color_picker("2. Warna Utama", st.session_state.mid_val, key="mid_picker")
-    glow_color = st.color_picker("3. Glow Highlight", st.session_state.glow_val, key="glow_picker")
+    # Langsung menggunakan key sebagai penyimpan state resmi Streamlit
+    shadow_color = st.color_picker("1. Shadow Celah", key="shadow_picker")
+    mid_color = st.color_picker("2. Warna Utama", key="mid_picker")
+    glow_color = st.color_picker("3. Glow Highlight", key="glow_picker")
     
     hue_shift = st.slider("RGB Hue Shift", 0, 360, 0, 5)
     vibrancy = st.slider("Saturasi / Vibrancy", 0.5, 2.0, 1.1, 0.1)
@@ -287,7 +288,6 @@ def render_studio_all(arr, extra_hue=0):
 
     return out_img, glow_img, lum, glow_alpha
 
-# HELPER BARU: Spritesheet Layout Canvas Generator
 def create_spritesheet(frames, cols, padding=0):
     if not frames: return None
     n = len(frames)
@@ -354,7 +354,6 @@ if uploaded_file is not None:
                 grid_3x3.paste(out_z, (gx * w * zoom, gy * h * zoom))
         st.image(grid_3x3)
 
-    # TAB BARU: SPRITE SHEET BUILDER
     with tab3:
         st.subheader("📊 Custom Sprite Sheet Generator")
         st.caption("Buat Sprite Sheet animasi berformat PNG transparan siap pakai untuk Mod Terraria / Game Engine.")
@@ -410,7 +409,6 @@ if uploaded_file is not None:
 
             spritesheet_img = create_spritesheet(sheet_frames, cols=grid_cols, padding=frame_padding)
             
-            # Save to Session State
             buf_ss = io.BytesIO()
             spritesheet_img.save(buf_ss, format="PNG")
             st.session_state['spritesheet_bytes'] = buf_ss.getvalue()
@@ -421,7 +419,6 @@ if uploaded_file is not None:
             sw, sh = st.session_state['spritesheet_size']
             st.write(f"📐 **Ukuran Sprite Sheet:** `{sw} x {sh} pixels`")
             
-            # Magnify Sheet Preview
             ss_preview_img = Image.open(io.BytesIO(st.session_state['spritesheet_bytes']))
             st.image(ss_preview_img.resize((sw * max(1, zoom//2), sh * max(1, zoom//2)), Image.NEAREST))
             
