@@ -8,23 +8,20 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Terraria Weapon Master Studio v9.0 Pro",
+    page_title="Terraria Weapon Master Studio v9.1",
     page_icon="🗡️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# 2. CUSTOM PREMIUM CSS (DARK GLASSMORPHISM STUDIO THEME)
+# 2. CUSTOM PREMIUM CSS
 st.markdown("""
 <style>
-    /* Dark Gradient Background */
     .stApp {
         background: linear-gradient(135deg, #0d0b18 0%, #161224 50%, #0a0813 100%);
         color: #e2e8f0;
         font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
-    
-    /* Studio Header Banner */
     .studio-header {
         background: linear-gradient(90deg, rgba(138, 43, 226, 0.15) 0%, rgba(0, 255, 255, 0.15) 100%);
         border: 1px solid rgba(212, 165, 255, 0.2);
@@ -34,7 +31,6 @@ st.markdown("""
         margin-bottom: 24px;
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     }
-    
     .studio-title {
         font-size: 2.2rem;
         font-weight: 800;
@@ -43,28 +39,11 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         margin: 0;
     }
-    
     .studio-subtitle {
         color: #94a3b8;
         font-size: 0.95rem;
         margin-top: 6px;
     }
-
-    /* Glassmorphism Cards */
-    div[data-testid="stMetricValue"] {
-        color: #38bdf8 !important;
-    }
-    
-    .glass-card {
-        background: rgba(23, 18, 38, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        backdrop-filter: blur(12px);
-        border-radius: 14px;
-        padding: 18px;
-        margin-bottom: 18px;
-    }
-    
-    /* Neon Glow Buttons */
     .stButton > button, .stDownloadButton > button {
         background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%) !important;
         color: #ffffff !important;
@@ -75,20 +54,15 @@ st.markdown("""
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3) !important;
     }
-    
     .stButton > button:hover, .stDownloadButton > button:hover {
         transform: translateY(-2px) scale(1.02) !important;
         box-shadow: 0 8px 25px rgba(168, 85, 247, 0.6) !important;
         filter: brightness(1.1) !important;
     }
-
-    /* Sidebar Styling */
     section[data-testid="stSidebar"] {
         background-color: #090712 !important;
         border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
     }
-    
-    /* Section Divider Line */
     hr {
         border-color: rgba(255, 255, 255, 0.08) !important;
         margin: 28px 0 !important;
@@ -96,16 +70,37 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. STUDIO HEADER BANNER
+# 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v9.0</div>
-    <div class="studio-subtitle">Studio Modding Terraria Pro: Auto 45° Rotator, Interactive Pivot Inspector, Clean Animated GIF Engine, Pro Particle Dust Engine, & All-in-One Mod Exporter.</div>
+    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v9.1</div>
+    <div class="studio-subtitle">Studio Modding Terraria Pro: Sync Number Inputs + Sliders, 25+ Model Dust Particle Engine, Clean GIF Player, & Mod Exporter.</div>
 </div>
 """, unsafe_allow_html=True)
 
+# 4. HELPER SYNC FUNCTION UNTUK SLIDER + NUMBER INPUT
+def sync_control(key_name, default_val, min_val, max_val, step_val, label_text):
+    """Fungsi pembantu yang menyinkronkan Slider dan Number Input secara 2-arah."""
+    if key_name not in st.session_state:
+        st.session_state[key_name] = default_val
+
+    col_a, col_b = st.sidebar.columns([2, 1])
+    
+    val_num = col_b.number_input(
+        f"{label_text} (#)", min_value=min_val, max_value=max_val, 
+        value=st.session_state[key_name], step=step_val, key=f"{key_name}_num"
+    )
+    st.session_state[key_name] = val_num
+    
+    val_slide = col_a.slider(
+        label_text, min_value=min_val, max_value=max_val, 
+        value=st.session_state[key_name], step=step_val, key=f"{key_name}_slide"
+    )
+    st.session_state[key_name] = val_slide
+    return st.session_state[key_name]
+
 # ==========================================
-# 4. ENGINE CORE FUNCTIONS
+# 5. CORE ENGINE FUNCTIONS
 # ==========================================
 def rotate_nearest_neighbor(image, angle):
     return image.rotate(angle, resample=Image.NEAREST, expand=True)
@@ -134,7 +129,6 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
     
     for i in range(p_count):
         birth_progress = random.uniform(0.0, 1.0)
-        
         if swing_progress >= birth_progress:
             age = (swing_progress - birth_progress)
             angle_at_birth = (half_range - birth_progress * swing_arc_range) + base_rot_angle
@@ -143,49 +137,66 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
             r_scatter = random.uniform(-6, 6)
             spawn_x = center + (base_radius + r_scatter) * math.cos(spawn_rad)
             spawn_y = center + (base_radius + r_scatter) * math.sin(spawn_rad)
-            
             drift_x = random.uniform(-4, 4) * age * 10
             
-            if p_style == "🔥 Fire Embers":
-                drift_y = -random.uniform(5, 12) * age * 12
-                p_r = max(1, int((1.0 - age * 0.7) * random.uniform(2, 5)))
-                alpha = int(max(0, (1.0 - age) * 255))
-                draw.ellipse(
-                    [spawn_x + drift_x - p_r, spawn_y + drift_y - p_r, spawn_x + drift_x + p_r, spawn_y + drift_y + p_r], 
-                    fill=(255, int(max(0, 200 - age * 200)), 0, alpha)
-                )
+            alpha = int(max(0, (1.0 - age) * 255))
+            p_r = max(1, int((1.0 - age * 0.5) * random.uniform(2, 4)))
+            px, py = spawn_x + drift_x, spawn_y + (-random.uniform(2, 8) * age * 10)
 
+            # --- 25 VARIATION PARTICLE LOGIC ---
+            if p_style == "🔥 Fire Embers":
+                draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], fill=(255, int(max(0, 200 - age * 200)), 0, alpha))
             elif p_style == "✨ Magic Sparkles":
-                drift_y = random.uniform(-3, 3) * age * 8
-                p_r = max(1, int((1.0 - age * 0.5) * random.uniform(2, 4)))
-                alpha = int(max(0, (1.0 - age) * 255))
-                px, py = spawn_x + drift_x, spawn_y + drift_y
                 draw.line([(px - p_r * 2, py), (px + p_r * 2, py)], fill=(r_c, g_c, b_c, alpha), width=1)
                 draw.line([(px, py - p_r * 2), (px, py + p_r * 2)], fill=(r_c, g_c, b_c, alpha), width=1)
                 draw.rectangle([px - 1, py - 1, px + 1, py + 1], fill=(255, 255, 255, alpha))
-
-            elif p_style == "⚡ Electric Sparks":
-                drift_y = random.uniform(-6, 6) * age * 8
-                alpha = int(max(0, (1.0 - age * 1.2) * 255))
-                px, py = spawn_x + drift_x, spawn_y + drift_y
-                dx1, dy1 = random.randint(-4, 4), random.randint(-4, 4)
-                dx2, dy2 = dx1 + random.randint(-4, 4), dy1 + random.randint(-4, 4)
-                draw.line([(px, py), (px + dx1, py + dy1), (px + dx2, py + dy2)], fill=(r_c, g_c, 255, alpha), width=1)
-
             elif p_style == "❄️ Ice Crystals":
-                drift_y = random.uniform(2, 8) * age * 8
-                p_r = max(1, int((1.0 - age * 0.4) * random.uniform(2, 4)))
-                alpha = int(max(0, (1.0 - age) * 240))
-                px, py = spawn_x + drift_x, spawn_y + drift_y
                 draw.polygon([(px, py - p_r), (px + p_r, py), (px, py + p_r), (px - p_r, py)], fill=(200, 240, 255, alpha))
-
-            else:
-                drift_y = random.uniform(3, 10) * age * 10
-                p_r = max(1, int((1.0 - age * 0.3) * random.uniform(2, 5)))
-                alpha = int(max(0, (1.0 - age) * 220))
-                px, py = spawn_x + drift_x, spawn_y + drift_y
+            elif p_style == "⚡ Electric Sparks":
+                dx1, dy1 = random.randint(-4, 4), random.randint(-4, 4)
+                draw.line([(px, py), (px + dx1, py + dy1)], fill=(r_c, g_c, 255, alpha), width=1)
+            elif p_style == "🟢 Toxic Slime Bubbles":
                 draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], outline=(50, 255, 100, alpha), width=1)
-                draw.ellipse([px - 1, py - 1, px + 1, py + 1], fill=(150, 255, 150, alpha))
+            elif p_style == "🌸 Cherry Blossoms":
+                draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], fill=(255, 182, 193, alpha))
+            elif p_style == "🌌 Cosmic Nebulae":
+                draw.ellipse([px - p_r*2, py - p_r*2, px + p_r*2, py + p_r*2], fill=(138, 43, 226, int(alpha*0.5)))
+            elif p_style == "🌋 Lava Sparks":
+                draw.rectangle([px - 1, py - 1, px + 1, py + 1], fill=(255, 68, 0, alpha))
+            elif p_style == "💥 Explosion Cinders":
+                draw.polygon([(px, py - p_r), (px + p_r, py), (px, py + p_r)], fill=(255, 140, 0, alpha))
+            elif p_style == "☀️ Solar Flares":
+                draw.ellipse([px - p_r*1.5, py - p_r*1.5, px + p_r*1.5, py + p_r*1.5], fill=(255, 215, 0, alpha))
+            elif p_style == "🍃 Forest Leaves":
+                draw.polygon([(px - p_r, py), (px, py - p_r*2), (px + p_r, py), (px, py + p_r)], fill=(34, 139, 34, alpha))
+            elif p_style == "💧 Water Drops":
+                draw.ellipse([px - 1, py - p_r*1.5, px + 1, py + p_r*1.5], fill=(30, 144, 255, alpha))
+            elif p_style == "🌟 Starlight Rays":
+                draw.line([(px - p_r*3, py), (px + p_r*3, py)], fill=(255, 255, 255, alpha), width=1)
+            elif p_style == "🔮 Rune Symbols":
+                draw.rectangle([px - p_r, py - p_r, px + p_r, py + p_r], outline=(147, 112, 219, alpha), width=1)
+            elif p_style == "🩸 Blood Spatters":
+                draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], fill=(178, 34, 34, alpha))
+            elif p_style == "👾 Cyber Glitch Pixels":
+                draw.rectangle([px - 2, py - 1, px + 2, py + 1], fill=(0, 255, 255, alpha))
+            elif p_style == "💀 Shadow Smoke":
+                draw.ellipse([px - p_r*2, py - p_r*2, px + p_r*2, py + p_r*2], fill=(40, 40, 50, int(alpha*0.4)))
+            elif p_style == "🪙 Golden Shimmers":
+                draw.polygon([(px, py - p_r), (px + p_r, py), (px, py + p_r), (px - p_r, py)], fill=(255, 223, 0, alpha))
+            elif p_style == "🕷️ Venom Drips":
+                draw.line([(px, py), (px, py + p_r*2)], fill=(128, 0, 128, alpha), width=2)
+            elif p_style == "💨 Wind Gusts":
+                draw.arc([px - 5, py - 5, px + 5, py + 5], start=0, end=180, fill=(240, 248, 255, alpha), width=1)
+            elif p_style == "⚛️ Quantum Plasma":
+                draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], fill=(0, 255, 200, alpha))
+            elif p_style == "⚡ Void Lightning":
+                draw.line([(px, py), (px + 3, py + 3), (px - 2, py + 6)], fill=(138, 43, 226, alpha), width=1)
+            elif p_style == "🌧️ Snow Flakes":
+                draw.rectangle([px - p_r, py - p_r, px + p_r, py + p_r], fill=(255, 255, 255, alpha))
+            elif p_style == "💥 Arcane Orbs":
+                draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], fill=(218, 112, 214, alpha))
+            else: # 💖 Heart Particles
+                draw.polygon([(px - 2, py), (px, py - 2), (px + 2, py), (px, py + 3)], fill=(255, 105, 180, alpha))
 
     glow = layer.filter(ImageFilter.GaussianBlur(radius=2))
     return Image.alpha_composite(glow, layer)
@@ -317,7 +328,7 @@ def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padd
     return sheet, cols, rows
 
 # ==========================================
-# 5. SIDEBAR CONTROLS
+# 6. SIDEBAR CONTROLS (WITH DUAL SYNC INPUTS)
 # ==========================================
 st.sidebar.markdown("### 📁 1. Sprite Input")
 uploaded_file = st.sidebar.file_uploader("Upload File Senjata PNG:", type=["png"])
@@ -328,12 +339,13 @@ uploaded_effect = st.sidebar.file_uploader("Upload Efek External PNG:", type=["p
 
 if uploaded_effect is not None:
     custom_eff_img = Image.open(uploaded_effect).convert("RGBA")
-    eff_rot_extra = st.sidebar.slider("Rotasi Ekstra Efek (°):", -180, 180, 0)
+    st.sidebar.markdown("**Transformasi Efek Custom:**")
+    eff_rot_extra = sync_control("eff_rot_extra", 0, -180, 180, 1, "Rotasi Ekstra Efek")
     col_f1, col_f2 = st.sidebar.columns(2)
     eff_flip_h = col_f1.checkbox("Flip H", value=False)
     eff_flip_v = col_f2.checkbox("Flip V", value=False)
     eff_scale_val = st.sidebar.slider("Skala Efek:", 0.2, 3.0, 1.0, 0.1)
-    eff_dist_offset = st.sidebar.slider("Offset Jarak:", -50, 80, 15, 1)
+    eff_dist_offset = sync_control("eff_dist_offset", 15, -50, 80, 1, "Offset Jarak Efek")
     eff_opacity_val = st.sidebar.slider("Transparansi:", 0.1, 1.0, 0.9, 0.05)
 else:
     custom_eff_img = None
@@ -350,48 +362,57 @@ if uploaded_file is not None:
     st.sidebar.markdown("---")
     st.sidebar.markdown("### ⚙️ 3. Tipe & Rotasi Senjata")
     weapon_type = st.sidebar.selectbox("Kategori Senjata:", ["⚔️ Broadsword / Sword", "🔱 Spear / Polearm", "🌙 Scythe / Axe (360° Spin)", "🪀 Yoyo Spin"])
-    base_angle_val = st.sidebar.slider("Sudut Rotasi Awal Base (°):", -180, 180, 45)
-    swing_arc_range_val = st.sidebar.slider("Rentang Sudut Tebasan (°):", 30, 240, 130, 5)
+    
+    base_angle_val = sync_control("base_angle", 45, -180, 180, 1, "Sudut Rotasi Base (°)")
+    swing_arc_range_val = sync_control("swing_arc_range", 130, 30, 240, 5, "Rentang Sudut Tebasan (°)")
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🎯 4. Grip Pivot Position")
-    preset_choice = st.sidebar.radio("Preset Pegangan Cepat:", ["Custom", "🗡️ Dagger/Shortsword", "⚔️ Broadsword", "🔱 Spear"])
-    if preset_choice == "🗡️ Dagger/Shortsword": def_x, def_y = 15, 85
-    elif preset_choice == "⚔️ Broadsword": def_x, def_y = 25, 75
-    elif preset_choice == "🔱 Spear": def_x, def_y = 40, 60
-    else: def_x, def_y = 25, 75
+    preset_choice = st.sidebar.radio("Preset Pegangan Cepat:", ["Custom", "🗡️ Shortsword (15,85)", "⚔️ Broadsword (25,75)", "🔱 Spear (40,60)"])
+    if preset_choice == "🗡️ Shortsword (15,85)": def_x, def_y = 15, 85
+    elif preset_choice == "⚔️ Broadsword (25,75)": def_x, def_y = 25, 75
+    elif preset_choice == "🔱 Spear (40,60)": def_x, def_y = 40, 60
+    else: def_x, def_y = st.session_state.get("pivot_x", 25), st.session_state.get("pivot_y", 75)
 
-    pivot_x_pct = st.sidebar.slider("Grip Posisi X (%):", 0, 100, def_x)
-    pivot_y_pct = st.sidebar.slider("Grip Posisi Y (%):", 0, 100, def_y)
+    pivot_x_pct = sync_control("pivot_x", def_x, 0, 100, 1, "Grip Posisi X (%)")
+    pivot_y_pct = sync_control("pivot_y", def_y, 0, 100, 1, "Grip Posisi Y (%)")
     pivot_x_px = int((pivot_x_pct / 100.0) * src_image.width)
     pivot_y_px = int((pivot_y_pct / 100.0) * src_image.height)
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### ✨ 5. Pro Particle Dust Engine")
+    st.sidebar.markdown("### ✨ 5. Pro Particle Dust Engine (25 Variations)")
     enable_dust = st.sidebar.checkbox("Aktifkan Dust FX", value=True)
-    particle_style = st.sidebar.selectbox("Model Dust Partikel:", ["✨ Magic Sparkles", "🔥 Fire Embers", "❄️ Ice Crystals", "⚡ Electric Sparks", "🟢 Toxic Slime Bubbles"])
-    particle_count = st.sidebar.slider("Kepadatan Partikel:", 5, 50, 25)
+    
+    particle_options = [
+        "✨ Magic Sparkles", "🔥 Fire Embers", "❄️ Ice Crystals", "⚡ Electric Sparks", "🟢 Toxic Slime Bubbles",
+        "🌸 Cherry Blossoms", "🌌 Cosmic Nebulae", "🌋 Lava Sparks", "💥 Explosion Cinders", "☀️ Solar Flares",
+        "🍃 Forest Leaves", "💧 Water Drops", "🌟 Starlight Rays", "🔮 Rune Symbols", "🩸 Blood Spatters",
+        "👾 Cyber Glitch Pixels", "💀 Shadow Smoke", "🪙 Golden Shimmers", "🕷️ Venom Drips", "💨 Wind Gusts",
+        "⚛️ Quantum Plasma", "⚡ Void Lightning", "🌧️ Snow Flakes", "💥 Arcane Orbs", "💖 Heart Particles"
+    ]
+    particle_style = st.sidebar.selectbox("Model Dust Partikel:", particle_options)
+    particle_count = sync_control("particle_count", 25, 5, 80, 1, "Kepadatan Partikel")
     particle_color = st.sidebar.color_picker("Warna Partikel:", "#00FFFF")
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🖼️ 6. Sprite Sheet Layout")
     sheet_orientation = st.sidebar.selectbox("Arah Layout Grid:", ["Horizontal Grid (Kiri ke Kanan)", "Vertical Grid (Atas ke Bawah)", "Horizontal Strip (1 Baris Horizontal)", "Vertical Strip (1 Kolom Vertikal)"])
-    grid_limit = st.sidebar.slider("Jumlah Kolom/Baris Grid:", 2, 8, 4) if "Grid" in sheet_orientation else 1
-    padding_between_frames = st.sidebar.slider("Padding Antar Frame (Px):", 0, 16, 0)
+    grid_limit = sync_control("grid_limit", 4, 2, 8, 1, "Jumlah Kolom/Baris Grid") if "Grid" in sheet_orientation else 1
+    padding_between_frames = sync_control("padding_frames", 0, 0, 16, 1, "Padding Antar Frame (Px)")
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🪄 7. Glowmask Generator")
     enable_glowmask = st.sidebar.checkbox("Generate Glowmask", value=False)
-    glow_threshold = st.sidebar.slider("Threshold Glow:", 50, 255, 180)
+    glow_threshold = sync_control("glow_thresh", 180, 50, 255, 5, "Threshold Glow")
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🎬 8. Export & Preview FPS")
-    sheet_frames_count = st.sidebar.slider("Jumlah Frame Animasi:", 3, 12, 6)
+    st.sidebar.markdown("### 🎬 8. Export & Preview Settings")
+    sheet_frames_count = sync_control("sheet_frames", 6, 3, 16, 1, "Jumlah Frame Animasi")
     frame_canvas_size = st.sidebar.select_slider("Resolusi Canvas (Px):", options=[64, 80, 96, 128], value=80)
-    anim_fps = st.select_slider("Frame Rate Preview (FPS):", options=[5, 8, 10, 12, 15, 20], value=10)
+    anim_fps = sync_control("anim_fps", 10, 5, 30, 1, "Frame Rate Preview (FPS)")
 
     # ==========================================
-    # 6. MAIN STUDIO DASHBOARD VIEW
+    # 7. MAIN STUDIO DASHBOARD VIEW
     # ==========================================
     col_v1, col_v2, col_v3 = st.columns([1, 1, 1])
 
@@ -446,7 +467,17 @@ if uploaded_file is not None:
     st.markdown("---")
     st.markdown("### 💻 4. TModLoader C# Code Generator")
     item_style = "ItemUseStyleID.Swing" if "Sword" in weapon_type or "Scythe" in weapon_type else ("ItemUseStyleID.Thrust" if "Spear" in weapon_type else "ItemUseStyleID.Shoot")
-    dust_id_map = {"✨ Magic Sparkles": "DustID.Electric", "🔥 Fire Embers": "DustID.Torch", "❄️ Ice Crystals": "DustID.IceTorch", "⚡ Electric Sparks": "DustID.PurpleTorch", "🟢 Toxic Slime Bubbles": "DustID.Acid"}
+    dust_id_map = {
+        "✨ Magic Sparkles": "DustID.Electric", "🔥 Fire Embers": "DustID.Torch", "❄️ Ice Crystals": "DustID.IceTorch",
+        "⚡ Electric Sparks": "DustID.PurpleTorch", "🟢 Toxic Slime Bubbles": "DustID.Acid", "🌸 Cherry Blossoms": "DustID.PinkFairy",
+        "🌌 Cosmic Nebulae": "DustID.Shadowflame", "🌋 Lava Sparks": "DustID.Lava", "💥 Explosion Cinders": "DustID.InfernoFork",
+        "☀️ Solar Flares": "DustID.SolarFlare", "🍃 Forest Leaves": "DustID.Grass", "💧 Water Drops": "DustID.Water",
+        "🌟 Starlight Rays": "DustID.Starfury", "🔮 Rune Symbols": "DustID.EnchantedNightcrawler", "🩸 Blood Spatters": "DustID.Blood",
+        "👾 Cyber Glitch Pixels": "DustID.BlueCrystalShard", "💀 Shadow Smoke": "DustID.Smoke", "🪙 Golden Shimmers": "DustID.GoldFlame",
+        "🕷️ Venom Drips": "DustID.Venom", "💨 Wind Gusts": "DustID.Cloud", "⚛️ Quantum Plasma": "DustID.Vortex",
+        "⚡ Void Lightning": "DustID.ShadowbeamStaff", "🌧️ Snow Flakes": "DustID.Snow", "💥 Arcane Orbs": "DustID.Nebula",
+        "💖 Heart Particles": "DustID.Heart"
+    }
     dust_type_str = dust_id_map.get(particle_style, "DustID.Electric")
     
     csharp_code = f"""using Microsoft.Xna.Framework;
@@ -473,7 +504,7 @@ namespace YourModName.Items
             Item.rare = ItemRarityID.Green;
         }}
 
-        // Terraria Melee Dust Trail Effect
+        // Terraria Melee Dust Trail Effect ({particle_style})
         public override void MeleeEffects(Player player, Rectangle hitbox)
         {{
             if (Main.rand.NextBool(2))
