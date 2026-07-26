@@ -8,7 +8,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Terraria Weapon Master Studio v10.0",
+    page_title="Terraria Weapon Master Studio v10.1",
     page_icon="🗡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -73,8 +73,8 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v10.0</div>
-    <div class="studio-subtitle">Studio Modding Terraria Pro: Custom PNG Particle Engine, Smooth Fade-In/Out, Sync Controls, Clean GIF Player, & Mod Exporter.</div>
+    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v10.1</div>
+    <div class="studio-subtitle">Studio Modding Terraria Pro: Anti-Crop Smart Canvas, True Blade-Tracking Particles, Smooth Fade, & Mod Exporter.</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -130,7 +130,7 @@ def generate_glowmask(image, threshold=200):
     img_np[mask, 3] = 0
     return Image.fromarray(img_np)
 
-def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range, p_style, p_count, p_color, p_seed, frame_idx, total_frames, fade_mult, custom_part_img, custom_part_scale):
+def render_advanced_dust_particles(canvas_size, weapon_radius, base_rot_angle, swing_arc_range, p_style, p_count, p_color, p_seed, frame_idx, total_frames, fade_mult, custom_part_img, custom_part_scale):
     layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
     center = canvas_size // 2
@@ -138,7 +138,8 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
     c_hex = p_color.lstrip('#')
     r_c, g_c, b_c = int(c_hex[0:2], 16), int(c_hex[2:4], 16), int(c_hex[4:6], 16)
     
-    base_radius = canvas_size * 0.42
+    # PERBAIKAN: Partikel menempel di 75%-90% ujung bilah pedang, bukan mengandalkan ukuran canvas!
+    base_radius = weapon_radius * 0.85 
     swing_progress = frame_idx / float(max(1, total_frames - 1))
     half_range = swing_arc_range / 2.0
 
@@ -151,7 +152,7 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
             angle_at_birth = (half_range - birth_progress * swing_arc_range) + base_rot_angle
             spawn_rad = math.radians(-angle_at_birth)
             
-            r_scatter = random.uniform(-6, 6)
+            r_scatter = random.uniform(-8, 8)
             spawn_x = center + (base_radius + r_scatter) * math.cos(spawn_rad)
             spawn_y = center + (base_radius + r_scatter) * math.sin(spawn_rad)
             drift_x = random.uniform(-4, 4) * age * 10
@@ -170,12 +171,10 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
                 
                 resized_p = custom_part_img.resize((w_p, h_p), resample=Image.NEAREST)
                 
-                # Apply Alpha
                 p_np = np.array(resized_p).copy()
                 p_np[:, :, 3] = (p_np[:, :, 3] * (alpha / 255.0)).astype(np.uint8)
                 resized_p = Image.fromarray(p_np)
                 
-                # Random spin for custom particle
                 rot_deg = random.randint(0, 360)
                 rotated_p = rotate_nearest_neighbor(resized_p, rot_deg)
                 
@@ -233,7 +232,7 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
                 draw.rectangle([px - p_r, py - p_r, px + p_r, py + p_r], fill=(255, 255, 255, alpha))
             elif p_style == "💥 Arcane Orbs":
                 draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], fill=(218, 112, 214, alpha))
-            else: # 💖 Heart Particles
+            else: 
                 draw.polygon([(px - 2, py), (px, py - 2), (px + 2, py), (px, py + 3)], fill=(255, 105, 180, alpha))
 
     glow = layer.filter(ImageFilter.GaussianBlur(radius=2))
@@ -272,7 +271,7 @@ def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v
 def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_angle, swing_arc_range, pivot_x, pivot_y, canvas_size, 
                             p_style, p_count, p_color, enable_dust,
                             custom_effect_img, eff_extra_rot, eff_flip_h, eff_flip_v, eff_offset, eff_scale, eff_opacity,
-                            fade_in_pct, fade_out_pct, custom_part_img, custom_part_scale):
+                            fade_in_pct, fade_out_pct, custom_part_img, custom_part_scale, weapon_radius):
     frame = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     canvas_center = canvas_size // 2
 
@@ -297,7 +296,7 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
 
     if enable_dust and w_type != "🔱 Spear / Polearm":
         dust_layer = render_advanced_dust_particles(
-            canvas_size, base_rot_angle, swing_arc_range, p_style, p_count, p_color, 
+            canvas_size, weapon_radius, base_rot_angle, swing_arc_range, p_style, p_count, p_color, 
             p_seed=42, frame_idx=frame_idx, total_frames=total_frames, fade_mult=fade_mult,
             custom_part_img=custom_part_img, custom_part_scale=custom_part_scale
         )
@@ -427,8 +426,12 @@ if uploaded_file is not None:
     pivot_x_px = int((pivot_x_pct / 100.0) * src_image.width)
     pivot_y_px = int((pivot_y_pct / 100.0) * src_image.height)
 
+    # --- PENTING: MENGHITUNG RADIUS TERJAUH DARI PIVOT KE UJUNG PEDANG ---
+    corners = [(0, 0), (src_image.width, 0), (0, src_image.height), (src_image.width, src_image.height)]
+    weapon_radius = max(math.hypot(cx - pivot_x_px, cy - pivot_y_px) for cx, cy in corners)
+
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### ✨ 6. Pro Particle Dust Engine (Custom PNG & 25 Presets)")
+    st.sidebar.markdown("### ✨ 6. Pro Particle Dust Engine")
     enable_dust = st.sidebar.checkbox("Aktifkan Dust FX", value=True)
     
     particle_options = [
@@ -441,7 +444,6 @@ if uploaded_file is not None:
     ]
     particle_style = st.sidebar.selectbox("Model Dust Partikel:", particle_options)
 
-    # UPLOAD CUSTOM PNG PARTICLE FILE
     if particle_style == "📁 Custom PNG Particle":
         uploaded_particle_file = st.sidebar.file_uploader("Upload PNG Partikel Custom:", type=["png"])
         if uploaded_particle_file is not None:
@@ -458,7 +460,12 @@ if uploaded_file is not None:
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🖼️ 7. Sprite Sheet Layout")
-    sheet_orientation = st.sidebar.selectbox("Arah Layout Grid:", ["Horizontal Grid (Kiri ke Kanan)", "Vertical Grid (Atas ke Bawah)", "Horizontal Strip (1 Baris Horizontal)", "Vertical Strip (1 Kolom Vertikal)"])
+    # PERBAIKAN: Default diubah ke Index 3 (Vertical Strip) agar kompatibel dengan standar TModLoader.
+    sheet_orientation = st.sidebar.selectbox(
+        "Arah Layout Grid:", 
+        ["Horizontal Grid (Kiri ke Kanan)", "Vertical Grid (Atas ke Bawah)", "Horizontal Strip (1 Baris Horizontal)", "Vertical Strip (1 Kolom Vertikal)"],
+        index=3
+    )
     grid_limit = sync_control("grid_limit", 4, 2, 8, 1, "Jumlah Kolom/Baris Grid") if "Grid" in sheet_orientation else 1
     padding_between_frames = sync_control("padding_frames", 0, 0, 16, 1, "Padding Antar Frame (Px)")
 
@@ -469,8 +476,17 @@ if uploaded_file is not None:
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🎬 9. Export & Preview Settings")
+    
+    # --- PENTING: SMART AUTO-CANVAS SIZER ---
+    # Hitung batas aman putaran pedang + ruang partikel agar tidak ada yang terpotong.
+    safe_canvas_size = max(128, int((weapon_radius * 2) + 60))
+    safe_canvas_size = min(1024, safe_canvas_size) # Cap max 1024
+    
     sheet_frames_count = sync_control("sheet_frames", 6, 3, 16, 1, "Jumlah Frame Animasi")
-    frame_canvas_size = st.sidebar.select_slider("Resolusi Canvas (Px):", options=[64, 80, 96, 128], value=80)
+    
+    st.sidebar.caption(f"*(Saran Anti-Crop: Auto-Canvas = {safe_canvas_size}px)*")
+    frame_canvas_size = sync_control("frame_canvas_size", safe_canvas_size, 64, 1024, 8, "Resolusi Canvas (Px)")
+    
     anim_fps = sync_control("anim_fps", 10, 5, 30, 1, "Frame Rate Preview (FPS)")
 
     # ==========================================
@@ -496,14 +512,14 @@ if uploaded_file is not None:
         rotated_base.save(buf_rot, format="PNG")
         st.download_button(f"💾 Download PNG ({base_angle_val}°)", data=buf_rot.getvalue(), file_name=f"Terraria_Item_{base_angle_val}deg.png", mime="image/png", use_container_width=True)
 
-    # RENDER ANIMATION FRAMES (WITH SMOOTH FADE + CUSTOM PNG PARTICLES)
+    # RENDER ANIMATION FRAMES (Anti-Crop & Smart Particle Scaling)
     rendered_frames = [
         generate_weapon_frame(
             src_image, weapon_type, idx, sheet_frames_count, 
             base_angle_val, swing_arc_range_val, pivot_x_px, pivot_y_px, frame_canvas_size, 
             particle_style, particle_count, particle_color, enable_dust,
             custom_eff_img, eff_rot_extra, eff_flip_h, eff_flip_v, eff_dist_offset, eff_scale_val, eff_opacity_val,
-            fade_in_pct_val, fade_out_pct_val, custom_part_img, custom_part_scale
+            fade_in_pct_val, fade_out_pct_val, custom_part_img, custom_part_scale, weapon_radius
         )
         for idx in range(sheet_frames_count)
     ]
@@ -620,7 +636,7 @@ namespace YourModName.Items
         rendered_frames, frame_canvas_size, sheet_orientation, grid_limit, padding_between_frames
     )
 
-    st.markdown(f"#### Grid Layout Sprite Sheet ({final_cols} Kolom x {final_rows} Baris):")
+    st.markdown(f"#### Layout Grid Sprite Sheet ({final_cols} Kolom x {final_rows} Baris):")
     st.image(sprite_sheet, caption=f"Sprite Sheet PNG ({sprite_sheet.width}x{sprite_sheet.height} px) - Layout: {sheet_orientation}", use_container_width=False)
 
     buf_sheet = io.BytesIO()
