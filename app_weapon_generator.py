@@ -8,7 +8,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Terraria Weapon Master Studio v14.2",
+    page_title="Terraria Weapon Master Studio v14.3",
     page_icon="🗡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -73,8 +73,8 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v14.2</div>
-    <div class="studio-subtitle">Studio Modding Terraria Pro: GD Physics Particle Engine, Trajectory Modes, & Scope Safety Fix.</div>
+    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v14.3</div>
+    <div class="studio-subtitle">Studio Modding Terraria Pro: GD Physics Particle Engine, Trajectory Modes, & Absolute NameError Safety.</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -408,7 +408,6 @@ def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padd
             c = idx % cols
         elif orientation == "Vertical Grid (Atas ke Bawah)":
             c = idx // rows
-            r = idx // rows
             r = idx % rows
         elif orientation == "Horizontal Strip (1 Baris Horizontal)":
             r = 0
@@ -423,7 +422,7 @@ def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padd
     return sheet, cols, rows
 
 # ==========================================
-# 7. GLOBAL SAFE DEFAULTS FOR CUSTOM EFFECT (FIX NAMEERROR)
+# 7. GLOBAL SAFE DEFAULTS FOR CUSTOM EFFECT (PREVENTS NAMEERROR)
 # ==========================================
 custom_eff_img = None
 eff_rot_extra = 0
