@@ -8,7 +8,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Terraria Weapon Master Studio v14.3",
+    page_title="Terraria Weapon Master Studio v14.4",
     page_icon="🗡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -73,8 +73,8 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v14.3</div>
-    <div class="studio-subtitle">Studio Modding Terraria Pro: GD Physics Particle Engine, Trajectory Modes, & Absolute NameError Safety.</div>
+    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v14.4</div>
+    <div class="studio-subtitle">Studio Modding Terraria Pro: GD Physics Particle Engine, Trajectory Modes, & Exact Parameter Mismatch Fix.</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -422,15 +422,15 @@ def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padd
     return sheet, cols, rows
 
 # ==========================================
-# 7. GLOBAL SAFE DEFAULTS FOR CUSTOM EFFECT (PREVENTS NAMEERROR)
+# 7. GLOBAL SAFE DEFAULTS FOR CUSTOM EFFECT (EXACT MATCH)
 # ==========================================
-custom_eff_img = None
-eff_rot_extra = 0
+custom_effect_img = None
+eff_extra_rot = 0
 eff_flip_h = False
 eff_flip_v = False
-eff_scale_val = 1.0
-eff_dist_offset = 0
-eff_opacity_val = 1.0
+eff_offset = 0
+eff_scale = 1.0
+eff_opacity = 1.0
 
 # ==========================================
 # 8. SIDEBAR CONTROLS
@@ -451,15 +451,15 @@ st.sidebar.markdown("### ✨ 3. Custom Image FX (Opsional)")
 uploaded_effect = st.sidebar.file_uploader("Upload Efek External PNG:", type=["png"])
 
 if uploaded_effect is not None:
-    custom_eff_img = Image.open(uploaded_effect).convert("RGBA")
+    custom_effect_img = Image.open(uploaded_effect).convert("RGBA")
     st.sidebar.markdown("**Transformasi Efek Custom:**")
-    eff_rot_extra = sync_control("eff_rot_extra", 0, -180, 180, 1, "Rotasi Ekstra Efek")
+    eff_extra_rot = sync_control("eff_extra_rot", 0, -180, 180, 1, "Rotasi Ekstra Efek")
     col_f1, col_f2 = st.sidebar.columns(2)
     eff_flip_h = col_f1.checkbox("Flip H", value=False)
     eff_flip_v = col_f2.checkbox("Flip V", value=False)
-    eff_scale_val = st.sidebar.slider("Skala Efek:", 0.2, 3.0, 1.0, 0.1)
-    eff_dist_offset = sync_control("eff_dist_offset", 15, -50, 80, 1, "Offset Jarak Efek")
-    eff_opacity_val = st.sidebar.slider("Transparansi:", 0.1, 1.0, 0.9, 0.05)
+    eff_scale = st.sidebar.slider("Skala Efek:", 0.2, 3.0, 1.0, 0.1)
+    eff_offset = sync_control("eff_offset", 15, -50, 80, 1, "Offset Jarak Efek")
+    eff_opacity = st.sidebar.slider("Transparansi:", 0.1, 1.0, 0.9, 0.05)
 
 if uploaded_file is not None:
     src_image = Image.open(uploaded_file).convert("RGBA")
@@ -627,7 +627,7 @@ if uploaded_file is not None:
             src_image, weapon_type, idx, sheet_frames_count, 
             base_angle_val, swing_arc_range_val, pivot_x_px, pivot_y_px, frame_canvas_size, 
             particle_layers_config, enable_dust,
-            custom_effect_img, eff_rot_extra, eff_flip_h, eff_flip_v, eff_dist_offset, eff_scale_val, eff_opacity_val,
+            custom_effect_img, eff_extra_rot, eff_flip_h, eff_flip_v, eff_offset, eff_scale, eff_opacity,
             fade_in_pct_val, fade_out_pct_val, weapon_radius,
             render_mode_choice, trajectory_mode, linear_travel_dist
         )
