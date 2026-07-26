@@ -5,10 +5,10 @@ import io
 import math
 import zipfile
 
-st.set_page_config(page_title="Terraria Weapon Master Studio v4.0", layout="wide")
+st.set_page_config(page_title="Terraria Weapon Master Studio v4.1", layout="wide")
 
-st.title("🗡️ Terraria Weapon Master Studio v4.0 (Complete Suite)")
-st.caption("Studio Modder Terraria: Auto 45°, Built-in Procedural Slash FX Generator, Custom Effect Importer, Sprite Sheet Layout, & ZIP Package Exporter!")
+st.title("🗡️ Terraria Weapon Master Studio v4.1 (Custom Rotation Suite)")
+st.caption("Studio Modder Terraria: Kontrol Rotasi Senjata & Efek Tebasan, Procedural Slash FX, Layout Sprite Sheet, & Package Exporter!")
 
 # ==========================================
 # 1. HELPER & EFFECT ENGINE FUNCTIONS
@@ -36,7 +36,7 @@ def render_player_arm(canvas_size):
     return arm
 
 def generate_procedural_slash_effect(canvas_size, style_type, current_angle, arc_span, arc_radius_ratio, glow_color, intensity):
-    """Membuat berbagai jenis efek tebasan sintetis dari algoritma Python secara langsung."""
+    """Membuat berbagai jenis efek tebasan sintetis dari algoritma Python."""
     layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
     center = canvas_size // 2
@@ -82,21 +82,33 @@ def generate_procedural_slash_effect(canvas_size, style_type, current_angle, arc
         draw.arc(bbox, start=start_deg, end=end_deg, fill=(255, 255, 255, 255), width=1)
         return layer
 
-def overlay_custom_effect_image(effect_img, angle, distance_offset, scale_val, opacity_val, canvas_size):
-    """Menyesuaikan posisi, rotasi, skala, dan transparansi dari Gambar Efek Custom External."""
+def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v, distance_offset, scale_val, opacity_val, canvas_size):
+    """Menyesuaikan posisi, rotasi custom, flip, skala, dan transparansi Gambar Efek External."""
     canvas_center = canvas_size // 2
     
-    new_w = max(1, int(effect_img.width * scale_val))
-    new_h = max(1, int(effect_img.height * scale_val))
-    resized_effect = effect_img.resize((new_w, new_h), resample=Image.NEAREST)
+    # 1. Flip Image jika diaktifkan
+    proc_eff = effect_img.copy()
+    if flip_h:
+        proc_eff = proc_eff.transpose(Image.FLIP_LEFT_RIGHT)
+    if flip_v:
+        proc_eff = proc_eff.transpose(Image.FLIP_TOP_BOTTOM)
     
+    # 2. Resize Efek
+    new_w = max(1, int(proc_eff.width * scale_val))
+    new_h = max(1, int(proc_eff.height * scale_val))
+    resized_effect = proc_eff.resize((new_w, new_h), resample=Image.NEAREST)
+    
+    # 3. Adjust Opacity
     if opacity_val < 1.0:
         eff_np = np.array(resized_effect).copy()
         eff_np[:, :, 3] = (eff_np[:, :, 3] * opacity_val).astype(np.uint8)
         resized_effect = Image.fromarray(eff_np)
         
-    rotated_eff = rotate_nearest_neighbor(resized_effect, angle)
+    # 4. Rotate Effect (Gabungkan sudut ayunan + ekstra rotasi manual)
+    total_angle = angle + eff_extra_rot
+    rotated_eff = rotate_nearest_neighbor(resized_effect, total_angle)
     
+    # 5. Offset Position
     rad = math.radians(-angle)
     off_x = int(distance_offset * math.cos(rad))
     off_y = int(distance_offset * math.sin(rad))
@@ -108,28 +120,32 @@ def overlay_custom_effect_image(effect_img, angle, distance_offset, scale_val, o
     layer.paste(rotated_eff, (paste_x, paste_y), rotated_eff)
     return layer
 
-def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, pivot_x, pivot_y, canvas_size, 
+def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_angle, swing_arc_range, pivot_x, pivot_y, canvas_size, 
                             slash_style, glow_color, arc_intensity, arc_span, arc_rad_ratio, 
-                            custom_effect_img, eff_offset, eff_scale, eff_opacity, show_arm):
+                            custom_effect_img, eff_extra_rot, eff_flip_h, eff_flip_v, eff_offset, eff_scale, eff_opacity, show_arm):
     frame = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     canvas_center = canvas_size // 2
 
     if show_arm:
         frame = Image.alpha_composite(frame, render_player_arm(canvas_size))
 
-    # Calculate Rotation Angle
+    # Calculate Dynamic Rotation Angle
+    half_range = swing_arc_range / 2.0
     if w_type == "⚔️ Broadsword / Sword":
-        angle = np.linspace(65, -65, total_frames)[frame_idx] + 45
+        angle = np.linspace(half_range, -half_range, total_frames)[frame_idx] + base_rot_angle
     elif w_type == "🌙 Scythe / Axe (360° Spin)":
-        angle = (frame_idx / float(total_frames)) * 360
+        angle = (frame_idx / float(total_frames)) * 360 + base_rot_angle
     elif w_type == "🪀 Yoyo Spin":
-        angle = (frame_idx / float(total_frames)) * 180
+        angle = (frame_idx / float(total_frames)) * 180 + base_rot_angle
     else: # Spear
-        angle = 45
+        angle = base_rot_angle
 
-    # 1. Overlay Custom PNG Effect (If Uploaded)
+    # 1. Overlay Custom PNG Effect (Jika Diunggah)
     if custom_effect_img is not None:
-        eff_layer = overlay_custom_effect_image(custom_effect_img, angle, eff_offset, eff_scale, eff_opacity, canvas_size)
+        eff_layer = overlay_custom_effect_image(
+            custom_effect_img, angle, eff_extra_rot, eff_flip_h, eff_flip_v, 
+            eff_offset, eff_scale, eff_opacity, canvas_size
+        )
         frame = Image.alpha_composite(frame, eff_layer)
 
     # 2. Overlay Procedural Slash Effect
@@ -141,9 +157,9 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, pivot_x, 
     # 3. Render Main Weapon
     if w_type == "🔱 Spear / Polearm":
         thrust_dist = np.sin((frame_idx / float(max(1, total_frames - 1))) * math.pi) * (canvas_size * 0.25)
-        rotated = rotate_nearest_neighbor(weapon_img, 45)
-        offset_x = int(thrust_dist * math.cos(math.radians(45)))
-        offset_y = int(-thrust_dist * math.sin(math.radians(45)))
+        rotated = rotate_nearest_neighbor(weapon_img, base_rot_angle)
+        offset_x = int(thrust_dist * math.cos(math.radians(base_rot_angle)))
+        offset_y = int(-thrust_dist * math.sin(math.radians(base_rot_angle)))
         paste_x = canvas_center - (rotated.width // 2) + offset_x
         paste_y = canvas_center - (rotated.height // 2) + offset_y
         frame.paste(rotated, (paste_x, paste_y), rotated)
@@ -214,15 +230,24 @@ uploaded_file = st.sidebar.file_uploader("Upload PNG Senjata Utama:", type=["png
 
 st.sidebar.markdown("---")
 st.sidebar.header("✨ 2. Custom Image Swing Effect (Opsional)")
-uploaded_effect = st.sidebar.file_uploader("Upload PNG Efek External (Bisa Dikosongkan):", type=["png"])
+uploaded_effect = st.sidebar.file_uploader("Upload PNG Efek External:", type=["png"])
 
 if uploaded_effect is not None:
     custom_eff_img = Image.open(uploaded_effect).convert("RGBA")
+    st.sidebar.markdown("**Transformasi & Rotasi Efek Custom:**")
+    eff_rot_extra = st.sidebar.slider("Rotasi Ekstra Efek (°):", -180, 180, 0)
+    col_f1, col_f2 = st.sidebar.columns(2)
+    eff_flip_h = col_f1.checkbox("Flip Horizontal", value=False)
+    eff_flip_v = col_f2.checkbox("Flip Vertikal", value=False)
+    
     eff_scale_val = st.sidebar.slider("Skala Efek Custom:", 0.2, 3.0, 1.0, 0.1)
     eff_dist_offset = st.sidebar.slider("Offset Jarak Efek:", -50, 80, 15, 1)
     eff_opacity_val = st.sidebar.slider("Transparansi (Opacity):", 0.1, 1.0, 0.9, 0.05)
 else:
     custom_eff_img = None
+    eff_rot_extra = 0
+    eff_flip_h = False
+    eff_flip_v = False
     eff_scale_val = 1.0
     eff_dist_offset = 0
     eff_opacity_val = 1.0
@@ -231,12 +256,16 @@ if uploaded_file is not None:
     src_image = Image.open(uploaded_file).convert("RGBA")
     
     st.sidebar.markdown("---")
-    st.sidebar.header("⚙️ 3. Tipe Senjata & Trajectory")
+    st.sidebar.header("⚙️ 3. Tipe Senjata & Pengaturan Rotasi")
     weapon_type = st.sidebar.selectbox(
         "Kategori Senjata:",
         ["⚔️ Broadsword / Sword", "🔱 Spear / Polearm", "🌙 Scythe / Axe (360° Spin)", "🪀 Yoyo Spin"]
     )
     
+    st.sidebar.markdown("**Atur Rotasi Senjata:**")
+    base_angle_val = st.sidebar.slider("Sudut Rotasi Awal/Base (°):", -180, 180, 45, help="Sudut awal pedang Terraria standar adalah 45°.")
+    swing_arc_range_val = st.sidebar.slider("Rentang Sudut Ayunan Tebasan (°):", 30, 240, 130, 5, help="Besarnya sudut tebasan dari awal hingga akhir ayunan.")
+
     st.sidebar.markdown("---")
     st.sidebar.header("📐 4. Grip Pivot Position")
     preset_choice = st.sidebar.radio("Preset Pegangan Cepat:", ["Custom", "🗡️ Dagger/Shortsword", "⚔️ Broadsword", "🔱 Spear"])
@@ -265,7 +294,7 @@ if uploaded_file is not None:
     )
     arc_color = st.sidebar.color_picker("Warna Efek:", "#00FFFF")
     arc_power = st.sidebar.slider("Intensitas Efek:", 0.0, 2.5, 1.2, 0.1)
-    arc_span_deg = st.sidebar.slider("Sudut Panjang Busur (°):", 30, 180, 90, 5)
+    arc_span_deg = st.sidebar.slider("Sudut Panjang Busur Arc (°):", 30, 180, 90, 5)
     arc_radius_val = st.sidebar.slider("Jangkauan Radius (% Canvas):", 20, 50, 42, 1) / 100.0
 
     st.sidebar.markdown("---")
@@ -307,28 +336,28 @@ if uploaded_file is not None:
         st.image(pivot_inspect_img, caption=f"Original Sprite ({src_image.width}x{src_image.height} px)", use_container_width=True)
 
     with col2:
-        st.subheader("⚔️ 2. Hasil Rotasi 45° Terraria")
-        rotated_45 = rotate_nearest_neighbor(src_image, 45)
-        st.image(rotated_45, caption=f"Terraria Ready 45° ({rotated_45.width}x{rotated_45.height} px)", use_container_width=True)
+        st.subheader(f"⚔️ 2. Hasil Rotasi ({base_angle_val}°)")
+        rotated_base = rotate_nearest_neighbor(src_image, base_angle_val)
+        st.image(rotated_base, caption=f"Ready Sprite {base_angle_val}° ({rotated_base.width}x{rotated_base.height} px)", use_container_width=True)
         
-        buf_rot45 = io.BytesIO()
-        rotated_45.save(buf_rot45, format="PNG")
-        st.download_button("💾 Download PNG Senjata 45°", data=buf_rot45.getvalue(), file_name="Terraria_Item_45deg.png", mime="image/png", use_container_width=True)
+        buf_rot = io.BytesIO()
+        rotated_base.save(buf_rot, format="PNG")
+        st.download_button(f"💾 Download PNG Senjata ({base_angle_val}°)", data=buf_rot.getvalue(), file_name=f"Terraria_Item_{base_angle_val}deg.png", mime="image/png", use_container_width=True)
 
     # GLOWMASK SECTION
-    glow_45 = None
+    glow_base = None
     if enable_glowmask:
         st.markdown("---")
         st.subheader("🪄 Glowmask Texture (`Item_Glow.png`)")
         col_g1, col_g2 = st.columns([1, 1])
         glow_img = generate_glowmask(src_image, threshold=glow_threshold)
-        glow_45 = rotate_nearest_neighbor(glow_img, 45)
+        glow_base = rotate_nearest_neighbor(glow_img, base_angle_val)
         
         with col_g1:
-            st.image(glow_45, caption="Glowmask Only (Bagian Menyala)", use_container_width=True)
+            st.image(glow_base, caption="Glowmask Only (Bagian Menyala)", use_container_width=True)
         with col_g2:
             buf_glow = io.BytesIO()
-            glow_45.save(buf_glow, format="PNG")
+            glow_base.save(buf_glow, format="PNG")
             st.download_button("💾 Download Glowmask PNG", data=buf_glow.getvalue(), file_name="Terraria_Item_Glow.png", mime="image/png", use_container_width=True)
 
     # C# CODE GENERATOR
@@ -346,8 +375,8 @@ namespace YourModName.Items
     {{
         public override void SetDefaults()
         {{
-            Item.width = {rotated_45.width};
-            Item.height = {rotated_45.height};
+            Item.width = {rotated_base.width};
+            Item.height = {rotated_base.height};
             Item.useStyle = {item_style};
             Item.useAnimation = 20;
             Item.useTime = 20;
@@ -370,10 +399,10 @@ namespace YourModName.Items
     rendered_frames = [
         generate_weapon_frame(
             src_image, weapon_type, idx, sheet_frames_count, 
-            pivot_x_px, pivot_y_px, frame_canvas_size, 
+            base_angle_val, swing_arc_range_val, pivot_x_px, pivot_y_px, frame_canvas_size, 
             slash_fx_style, arc_color, arc_power, 
             arc_span_deg, arc_radius_val, 
-            custom_eff_img, eff_dist_offset, eff_scale_val, eff_opacity_val, show_dummy_arm
+            custom_eff_img, eff_rot_extra, eff_flip_h, eff_flip_v, eff_dist_offset, eff_scale_val, eff_opacity_val, show_dummy_arm
         )
         for idx in range(sheet_frames_count)
     ]
@@ -400,8 +429,8 @@ namespace YourModName.Items
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        zip_file.writestr("CustomWeapon.png", buf_rot45.getvalue())
-        if glow_45:
+        zip_file.writestr("CustomWeapon.png", buf_rot.getvalue())
+        if glow_base:
             zip_file.writestr("CustomWeapon_Glow.png", buf_glow.getvalue())
         zip_file.writestr("CustomWeapon_SwingSheet.png", buf_sheet.getvalue())
         zip_file.writestr("CustomWeapon.cs", csharp_code)
