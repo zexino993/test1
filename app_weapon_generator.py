@@ -503,4 +503,171 @@ if uploaded_file is not None:
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🪄 9. Glowmask Generator")
     enable_glowmask = st.sidebar.checkbox("Generate Glowmask", value=False)
-    glow_threshold = sync_control("glow_thresh",
+    glow_threshold = sync_control("glow_thresh", 180, 50, 255, 5, "Threshold Glow")
+
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🎬 10. Export & Preview Settings")
+    
+    safe_canvas_size = max(128, int((weapon_radius * 2) + linear_travel_dist + 60))
+    safe_canvas_size = min(1024, safe_canvas_size)
+    
+    sheet_frames_count = sync_control("sheet_frames", 6, 3, 16, 1, "Jumlah Frame Animasi")
+    st.sidebar.caption(f"*(Saran Anti-Crop: Auto-Canvas = {safe_canvas_size}px)*")
+    frame_canvas_size = sync_control("frame_canvas_size", safe_canvas_size, 64, 1024, 8, "Resolusi Canvas (Px)")
+    anim_fps = sync_control("anim_fps", 10, 5, 30, 1, "Frame Rate Preview (FPS)")
+
+    # ==========================================
+    # 10. MAIN STUDIO DASHBOARD VIEW
+    # ==========================================
+    col_v1, col_v2, col_v3 = st.columns([1, 1, 1])
+
+    with col_v1:
+        st.markdown("##### 🎯 1. Pivot Crosshair Inspector")
+        pivot_inspect_img = src_image.copy()
+        draw_insp = ImageDraw.Draw(pivot_inspect_img)
+        cs = 4
+        draw_insp.line([(pivot_x_px - cs, pivot_y_px), (pivot_x_px + cs, pivot_y_px)], fill=(255, 0, 0, 255), width=2)
+        draw_insp.line([(pivot_x_px, pivot_y_px - cs), (pivot_x_px, pivot_y_px + cs)], fill=(255, 0, 0, 255), width=2)
+        st.image(pivot_inspect_img, caption=f"Original ({src_image.width}x{src_image.height} px)", use_container_width=True)
+
+    with col_v2:
+        st.subheader(f"⚔️ 2. Rotasi ({base_angle_val}°)")
+        rotated_base = rotate_nearest_neighbor(src_image, base_angle_val)
+        st.image(rotated_base, caption=f"Ready Sprite ({rotated_base.width}x{rotated_base.height} px)", use_container_width=True)
+        
+        buf_rot = io.BytesIO()
+        rotated_base.save(buf_rot, format="PNG")
+        st.download_button(f"💾 Download PNG ({base_angle_val}°)", data=buf_rot.getvalue(), file_name=f"Terraria_Item_{base_angle_val}deg.png", mime="image/png", use_container_width=True)
+
+    # RENDER ANIMATION FRAMES
+    rendered_frames = [
+        generate_weapon_frame(
+            src_image, weapon_type, idx, sheet_frames_count, 
+            base_angle_val, swing_arc_range_val, pivot_x_px, pivot_y_px, frame_canvas_size, 
+            particle_layers_config, enable_dust,
+            custom_effect_img, eff_extra_rot, eff_flip_h, eff_flip_v, eff_offset, eff_scale, eff_opacity,
+            fade_in_pct_val, fade_out_pct_val, weapon_radius,
+            render_mode_choice, trajectory_mode, linear_travel_dist
+        )
+        for idx in range(sheet_frames_count)
+    ]
+
+    with col_v3:
+        st.subheader("🎬 3. Live GIF Preview")
+        gif_bytes_io = io.BytesIO()
+        frame_delay = int(1000 / anim_fps)
+        rendered_frames[0].save(
+            gif_bytes_io, 
+            format="GIF", 
+            save_all=True, 
+            append_images=rendered_frames[1:], 
+            duration=frame_delay, 
+            loop=0, 
+            disposal=2
+        )
+        gif_bytes = gif_bytes_io.getvalue()
+        
+        st.image(gif_bytes, caption=f"Simple Particle Loop Preview ({render_mode_choice})", use_container_width=True)
+        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name=f"Terraria_Simple_Particle_{render_mode_choice}.gif", mime="image/gif", use_container_width=True)
+
+    # C# CODE SNIPPET SECTION
+    st.markdown("---")
+    st.markdown("### 💻 4. TModLoader C# Code Generator")
+    item_style = "ItemUseStyleID.Shoot" if trajectory_mode == "➡️ Straight Line / Projectile (Garis Lurus)" else ("ItemUseStyleID.Swing" if "Sword" in weapon_type or "Scythe" in weapon_type else "ItemUseStyleID.Thrust")
+    dust_id_map = {
+        "📁 Custom PNG Particle": "DustID.Electric",
+        "🔥 Fire Embers (Api)": "DustID.Torch", "✨ Magic Sparkles (Bintang)": "DustID.Electric", "❄️ Ice Crystals (Es)": "DustID.IceTorch",
+        "⚡ Electric Sparks (Listrik)": "DustID.PurpleTorch", "🟢 Toxic Slime (Racun)": "DustID.Acid", "🌸 Cherry Blossoms (Kelopak)": "DustID.PinkFairy",
+        "🌌 Cosmic Nebulae (Kosmik)": "DustID.Shadowflame", "🩸 Blood Spatters (Darah)": "DustID.Blood", "🪙 Golden Shimmers (Emas)": "DustID.GoldFlame",
+        "💨 Wind Gusts (Angin)": "DustID.Cloud"
+    }
+    primary_p_style = particle_layers_config[0]["style"]
+    dust_type_str = dust_id_map.get(primary_p_style, "DustID.Torch")
+    
+    csharp_code = f"""using Microsoft.Xna.Framework;
+using Terraria;
+using Terraria.ID;
+using Terraria.ModLoader;
+
+namespace YourModName.Items
+{{
+    public class CustomSimpleParticleItem : ModItem
+    {{
+        public override void SetDefaults()
+        {{
+            Item.width = {rotated_base.width};
+            Item.height = {rotated_base.height};
+            Item.useStyle = {item_style};
+            Item.useAnimation = 20;
+            Item.useTime = 20;
+            Item.damage = 50;
+            Item.knockBack = 5f;
+            Item.UseSound = SoundID.Item20;
+            Item.autoReuse = true;
+            Item.value = Item.buyPrice(gold: 2);
+            Item.rare = ItemRarityID.Orange;
+        }}
+
+        public override void MeleeEffects(Player player, Rectangle hitbox)
+        {{
+            if (Main.rand.NextBool(2))
+            {{
+                int dust = Dust.NewDust(
+                    new Vector2(hitbox.X, hitbox.Y), 
+                    hitbox.Width, 
+                    hitbox.Height, 
+                    {dust_type_str}, 
+                    player.velocity.X * 0.3f, 
+                    player.velocity.Y * 0.3f, 
+                    120, 
+                    default(Color), 
+                    1.4f
+                );
+                Main.dust[dust].noGravity = true;
+            }}
+        }}
+    }}
+}}"""
+    st.code(csharp_code, language="csharp")
+    st.download_button("💾 Download Script C# (.cs)", data=csharp_code, file_name="CustomSimpleParticleItem.cs", mime="text/plain", use_container_width=False)
+
+    # SPRITE SHEET SECTION
+    st.markdown("---")
+    st.markdown("### 🖼️ 5. Frame Inspection & Custom Layout Sprite Sheet")
+    
+    cols_ui = st.columns(min(6, len(rendered_frames)))
+    for i, frm in enumerate(rendered_frames):
+        cols_ui[i % 6].image(frm, caption=f"Frame {i+1}")
+
+    sprite_sheet, final_cols, final_rows = compile_custom_spritesheet(
+        rendered_frames, frame_canvas_size, sheet_orientation, grid_limit, padding_between_frames
+    )
+
+    st.markdown(f"#### Layout Grid Sprite Sheet ({final_cols} Kolom x {final_rows} Baris) - Mode: {render_mode_choice}:")
+    st.image(sprite_sheet, caption=f"Sprite Sheet PNG ({sprite_sheet.width}x{sprite_sheet.height} px)", use_container_width=False)
+
+    buf_sheet = io.BytesIO()
+    sprite_sheet.save(buf_sheet, format="PNG")
+    st.download_button(
+        f"💾 Download Sprite Sheet PNG ({'FX ONLY' if 'FX' in render_mode_choice else 'FULL'})", 
+        data=buf_sheet.getvalue(), 
+        file_name="Terraria_Simple_Particle_Sheet.png", 
+        mime="image/png", 
+        use_container_width=True
+    )
+
+    # ZIP EXPORTER SECTION
+    st.markdown("---")
+    st.markdown("### 📦 6. Export Complete Mod Package (.ZIP)")
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        zip_file.writestr("CustomItem.png", buf_rot.getvalue())
+        zip_file.writestr("CustomItem_Sheet.png", buf_sheet.getvalue())
+        zip_file.writestr("CustomItem_Animation.gif", gif_bytes)
+        zip_file.writestr("CustomSimpleParticleItem.cs", csharp_code)
+
+    st.download_button("📦 Download Complete Mod Package (.ZIP)", data=zip_buffer.getvalue(), file_name="Terraria_Mod_Simple_Particle_Package.zip", mime="application/zip", use_container_width=True)
+
+else:
+    st.info("👈 Silakan unggah file gambar PNG senjata atau proyektil milikmu di menu sebelah kiri untuk memulai studio!")
