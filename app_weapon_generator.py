@@ -8,7 +8,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Terraria Weapon Master Studio v14.0",
+    page_title="Terraria Weapon Master Studio v14.1",
     page_icon="🗡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -73,8 +73,8 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v14.0</div>
-    <div class="studio-subtitle">Studio Modding Terraria Pro: Geometry Dash Style Advanced Particle Physics Engine (Gravity, AccelRad, AccelTan, PosVar), Trajectory Modes, & FX Export.</div>
+    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v14.1</div>
+    <div class="studio-subtitle">Studio Modding Terraria Pro: GD Physics Particle Engine, Trajectory Modes, & NameError Fix.</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -157,7 +157,6 @@ def render_gd_particle_layer(draw, layer_canvas, canvas_size, weapon_radius, bas
             if age_norm > 1.0:
                 continue
 
-            # Base emitter position based on trajectory
             if trajectory_mode == "🌀 Arc Swing (Rotasi Berputar)":
                 base_radius = weapon_radius * 0.85
                 half_range = swing_arc_range / 2.0
@@ -171,23 +170,18 @@ def render_gd_particle_layer(draw, layer_canvas, canvas_size, weapon_radius, bas
                 emit_x = center + travel_progress * math.cos(rad_lin)
                 emit_y = center + travel_progress * math.sin(rad_lin)
 
-            # Position Variance (PosVar X & Y)
             px = emit_x + random.uniform(-pos_var_x, pos_var_x)
             py = emit_y + random.uniform(-pos_var_y, pos_var_y)
 
-            # Physics calculation with Angle, Speed, Gravity, and Acceleration (GD Style)
             particle_angle = math.radians(angle_deg + random.uniform(-angle_var, angle_var))
             current_speed = speed * (1.0 + age_norm)
             
-            # Displacement from physics
             dx = current_speed * math.cos(particle_angle) * (swing_progress - birth_progress) * 5
             dy = current_speed * math.sin(particle_angle) * (swing_progress - birth_progress) * 5
             
-            # Gravity and Acceleration influence
             dx += 0.5 * grav_x * (swing_progress - birth_progress)**2 * 50
             dy += 0.5 * grav_y * (swing_progress - birth_progress)**2 * 50
 
-            # Radial & Tangential acceleration
             if accel_rad != 0 or accel_tan != 0:
                 vec_x = px - emit_x
                 vec_y = py - emit_y
@@ -204,7 +198,6 @@ def render_gd_particle_layer(draw, layer_canvas, canvas_size, weapon_radius, bas
             alpha = int(base_alpha * fade_mult)
             p_r = max(1, int((1.0 - age_norm * 0.5) * random.uniform(2, 5)))
 
-            # Render custom or preset particle
             p_style = p_cfg["style"]
             custom_part_img = p_cfg.get("custom_img", None)
             custom_part_scale = p_cfg.get("custom_scale", 1.0)
@@ -446,6 +439,15 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("### ✨ 3. Custom Image FX (Opsional)")
 uploaded_effect = st.sidebar.file_uploader("Upload Efek External PNG:", type=["png"])
 
+# FIX: Inisialisasi variabel custom effect agar aman dari NameError jika tidak di-upload
+custom_eff_img = None
+eff_rot_extra = 0
+eff_flip_h = False
+eff_flip_v = False
+eff_scale_val = 1.0
+eff_dist_offset = 0
+eff_opacity_val = 1.0
+
 if uploaded_effect is not None:
     custom_eff_img = Image.open(uploaded_effect).convert("RGBA")
     st.sidebar.markdown("**Transformasi Efek Custom:**")
@@ -456,14 +458,6 @@ if uploaded_effect is not None:
     eff_scale_val = st.sidebar.slider("Skala Efek:", 0.2, 3.0, 1.0, 0.1)
     eff_dist_offset = sync_control("eff_dist_offset", 15, -50, 80, 1, "Offset Jarak Efek")
     eff_opacity_val = st.sidebar.slider("Transparansi:", 0.1, 1.0, 0.9, 0.05)
-else:
-    custom_eff_img = None
-    eff_rot_extra = 0
-    eff_flip_h = False
-    eff_flip_v = False
-    eff_scale_val = 1.0
-    eff_dist_offset = 0
-    eff_opacity_val = 1.0
 
 if uploaded_file is not None:
     src_image = Image.open(uploaded_file).convert("RGBA")
@@ -542,7 +536,6 @@ if uploaded_file is not None:
                 c_img = Image.open(up_p_file).convert("RGBA")
             c_scale = st.sidebar.slider(f"Skala PNG L{l_idx + 1}:", 0.1, 2.0, 0.5, 0.05, key=f"p_scale_{l_idx}")
 
-        # GD Parameters Sync Controls
         max_p = sync_control(f"max_p_{l_idx}", 30, 5, 100, 1, f"Max Particles L{l_idx + 1}")
         lifetime = sync_control(f"lifetime_{l_idx}", 100, 10, 500, 10, f"Lifetime L{l_idx + 1}") / 100.0
         speed = sync_control(f"speed_{l_idx}", 30, 0, 150, 5, f"Speed L{l_idx + 1}")
