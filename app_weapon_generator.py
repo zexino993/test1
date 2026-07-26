@@ -3,22 +3,21 @@ from PIL import Image, ImageDraw, ImageFilter
 import numpy as np
 import io
 import math
+import random
 import zipfile
 
-st.set_page_config(page_title="Terraria Weapon Master Studio v4.1", layout="wide")
+st.set_page_config(page_title="Terraria Weapon Master Studio v5.0", layout="wide")
 
-st.title("🗡️ Terraria Weapon Master Studio v4.1 (Custom Rotation Suite)")
-st.caption("Studio Modder Terraria: Kontrol Rotasi Senjata & Efek Tebasan, Procedural Slash FX, Layout Sprite Sheet, & Package Exporter!")
+st.title("🗡️ Terraria Weapon Master Studio v5.0 (Particle & Dust Engine)")
+st.caption("Studio Modder Terraria: Particle & Dust Trail Generator, Custom Rotation, Procedural & Custom Slash FX, Layout Sheet, & C# Dust Code Exporter!")
 
 # ==========================================
-# 1. HELPER & EFFECT ENGINE FUNCTIONS
+# 1. HELPER & PARTICLE ENGINE FUNCTIONS
 # ==========================================
 def rotate_nearest_neighbor(image, angle):
-    """Rotasi gambar dengan Nearest Neighbor agar piksel tetap tajam."""
     return image.rotate(angle, resample=Image.NEAREST, expand=True)
 
 def generate_glowmask(image, threshold=200):
-    """Membuat tekstur Glowmask untuk bagian yang menyala di tempat gelap."""
     img_np = np.array(image).copy()
     rgb = img_np[:, :, :3].astype(np.float32)
     luminance = 0.299 * rgb[:, :, 0] + 0.587 * rgb[:, :, 1] + 0.114 * rgb[:, :, 2]
@@ -27,16 +26,14 @@ def generate_glowmask(image, threshold=200):
     return Image.fromarray(img_np)
 
 def render_player_arm(canvas_size):
-    """Visualisasi Tangan Karakter Terraria (Dummy Arm)."""
     arm = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(arm)
     center = canvas_size // 2
-    draw.rectangle([center - 6, center + 4, center + 6, center + 18], fill=(198, 134, 100, 160)) # Kulit
-    draw.rectangle([center - 7, center + 12, center + 7, center + 22], fill=(80, 100, 180, 160)) # Baju
+    draw.rectangle([center - 6, center + 4, center + 6, center + 18], fill=(198, 134, 100, 160)) # Skin
+    draw.rectangle([center - 7, center + 12, center + 7, center + 22], fill=(80, 100, 180, 160)) # Shirt
     return arm
 
 def generate_procedural_slash_effect(canvas_size, style_type, current_angle, arc_span, arc_radius_ratio, glow_color, intensity):
-    """Membuat berbagai jenis efek tebasan sintetis dari algoritma Python."""
     layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
     center = canvas_size // 2
@@ -50,7 +47,6 @@ def generate_procedural_slash_effect(canvas_size, style_type, current_angle, arc
     c_hex = glow_color.lstrip('#')
     r_c, g_c, b_c = int(c_hex[0:2], 16), int(c_hex[2:4], 16), int(c_hex[4:6], 16)
     
-    # 1. STYLE: Smooth Energy Arc
     if style_type == "✨ Smooth Energy Arc":
         for i in range(3):
             w = int((6 + i * 4) * intensity)
@@ -60,7 +56,6 @@ def generate_procedural_slash_effect(canvas_size, style_type, current_angle, arc
         glow = layer.filter(ImageFilter.GaussianBlur(radius=3))
         return Image.alpha_composite(glow, layer)
 
-    # 2. STYLE: Flame Wave
     elif style_type == "🔥 Flame Wave":
         for i in range(5):
             r_offset = radius + (i * 3)
@@ -70,45 +65,78 @@ def generate_procedural_slash_effect(canvas_size, style_type, current_angle, arc
         glow = layer.filter(ImageFilter.GaussianBlur(radius=2))
         return Image.alpha_composite(glow, layer)
 
-    # 3. STYLE: Ice Crescent
     elif style_type == "❄️ Ice Crescent":
         draw.arc(bbox, start=start_deg, end=end_deg, fill=(r_c, g_c, b_c, int(200 * min(1.0, intensity))), width=int(10 * intensity))
         draw.arc(bbox, start=start_deg + 10, end=end_deg - 10, fill=(255, 255, 255, 255), width=int(4 * intensity))
         return layer
 
-    # 4. STYLE: Laser Blade Sharp
     else:
         draw.arc(bbox, start=start_deg, end=end_deg, fill=(r_c, g_c, b_c, int(255 * min(1.0, intensity))), width=int(3 * intensity))
         draw.arc(bbox, start=start_deg, end=end_deg, fill=(255, 255, 255, 255), width=1)
         return layer
 
+def render_dust_particles(canvas_size, current_angle, p_style, p_count, p_spread, p_color, p_seed, frame_idx):
+    """Generates Terraria Dust/Particle Trail FX."""
+    layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(layer)
+    center = canvas_size // 2
+    
+    c_hex = p_color.lstrip('#')
+    r_c, g_c, b_c = int(c_hex[0:2], 16), int(c_hex[2:4], 16), int(c_hex[4:6], 16)
+    
+    # Deterministic Seed per frame
+    random.seed(p_seed + frame_idx * 13)
+    
+    radius_base = canvas_size * 0.38
+    
+    for _ in range(p_count):
+        # Angle random spread along arc
+        ang_offset = random.uniform(-p_spread, p_spread)
+        part_angle = math.radians(-current_angle + ang_offset)
+        
+        # Distance random spread
+        dist = radius_base + random.uniform(-10, 10)
+        
+        # Particle Position
+        px = center + dist * math.cos(part_angle)
+        py = center + dist * math.sin(part_angle)
+        
+        p_size = random.randint(2, 5)
+        
+        if p_style == "✨ Magic Sparkles":
+            draw.rectangle([px - p_size, py - p_size, px + p_size, py + p_size], fill=(r_c, g_c, b_c, random.randint(180, 255)))
+            draw.rectangle([px - 1, py - 1, px + 1, py + 1], fill=(255, 255, 255, 255))
+        elif p_style == "🔥 Fire Embers":
+            up_y = py - random.randint(2, 6) # Float Up
+            draw.ellipse([px - p_size, up_y - p_size, px + p_size, up_y + p_size], fill=(255, random.randint(100, 200), 0, random.randint(150, 240)))
+        elif p_style == "❄️ Ice Shards":
+            draw.line([(px - p_size, py - p_size), (px + p_size, py + p_size)], fill=(200, 240, 255, 255), width=2)
+        elif p_style == "⚡ Electric Sparks":
+            draw.line([(px, py), (px + random.randint(-4, 4), py + random.randint(-4, 4))], fill=(r_c, g_c, 255, 255), width=2)
+        else: # Toxic Bubbles
+            draw.ellipse([px - p_size, py - p_size, px + p_size, py + p_size], outline=(0, 255, 100, 220), width=1)
+
+    glow = layer.filter(ImageFilter.GaussianBlur(radius=1))
+    return Image.alpha_composite(glow, layer)
+
 def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v, distance_offset, scale_val, opacity_val, canvas_size):
-    """Menyesuaikan posisi, rotasi custom, flip, skala, dan transparansi Gambar Efek External."""
     canvas_center = canvas_size // 2
-    
-    # 1. Flip Image jika diaktifkan
     proc_eff = effect_img.copy()
-    if flip_h:
-        proc_eff = proc_eff.transpose(Image.FLIP_LEFT_RIGHT)
-    if flip_v:
-        proc_eff = proc_eff.transpose(Image.FLIP_TOP_BOTTOM)
+    if flip_h: proc_eff = proc_eff.transpose(Image.FLIP_LEFT_RIGHT)
+    if flip_v: proc_eff = proc_eff.transpose(Image.FLIP_TOP_BOTTOM)
     
-    # 2. Resize Efek
     new_w = max(1, int(proc_eff.width * scale_val))
     new_h = max(1, int(proc_eff.height * scale_val))
     resized_effect = proc_eff.resize((new_w, new_h), resample=Image.NEAREST)
     
-    # 3. Adjust Opacity
     if opacity_val < 1.0:
         eff_np = np.array(resized_effect).copy()
         eff_np[:, :, 3] = (eff_np[:, :, 3] * opacity_val).astype(np.uint8)
         resized_effect = Image.fromarray(eff_np)
         
-    # 4. Rotate Effect (Gabungkan sudut ayunan + ekstra rotasi manual)
     total_angle = angle + eff_extra_rot
     rotated_eff = rotate_nearest_neighbor(resized_effect, total_angle)
     
-    # 5. Offset Position
     rad = math.radians(-angle)
     off_x = int(distance_offset * math.cos(rad))
     off_y = int(distance_offset * math.sin(rad))
@@ -122,6 +150,7 @@ def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v
 
 def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_angle, swing_arc_range, pivot_x, pivot_y, canvas_size, 
                             slash_style, glow_color, arc_intensity, arc_span, arc_rad_ratio, 
+                            p_style, p_count, p_spread, p_color, enable_dust,
                             custom_effect_img, eff_extra_rot, eff_flip_h, eff_flip_v, eff_offset, eff_scale, eff_opacity, show_arm):
     frame = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     canvas_center = canvas_size // 2
@@ -129,7 +158,6 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
     if show_arm:
         frame = Image.alpha_composite(frame, render_player_arm(canvas_size))
 
-    # Calculate Dynamic Rotation Angle
     half_range = swing_arc_range / 2.0
     if w_type == "⚔️ Broadsword / Sword":
         angle = np.linspace(half_range, -half_range, total_frames)[frame_idx] + base_rot_angle
@@ -140,7 +168,7 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
     else: # Spear
         angle = base_rot_angle
 
-    # 1. Overlay Custom PNG Effect (Jika Diunggah)
+    # 1. Overlay Custom PNG Effect
     if custom_effect_img is not None:
         eff_layer = overlay_custom_effect_image(
             custom_effect_img, angle, eff_extra_rot, eff_flip_h, eff_flip_v, 
@@ -154,7 +182,12 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
         proc_arc = generate_procedural_slash_effect(canvas_size, slash_style, angle, span, arc_rad_ratio, glow_color, arc_intensity)
         frame = Image.alpha_composite(frame, proc_arc)
 
-    # 3. Render Main Weapon
+    # 3. Overlay Dust Particles
+    if enable_dust and w_type != "🔱 Spear / Polearm":
+        dust_layer = render_dust_particles(canvas_size, angle, p_style, p_count, p_spread, p_color, seed_val=42, frame_idx=frame_idx)
+        frame = Image.alpha_composite(frame, dust_layer)
+
+    # 4. Render Main Weapon
     if w_type == "🔱 Spear / Polearm":
         thrust_dist = np.sin((frame_idx / float(max(1, total_frames - 1))) * math.pi) * (canvas_size * 0.25)
         rotated = rotate_nearest_neighbor(weapon_img, base_rot_angle)
@@ -239,7 +272,6 @@ if uploaded_effect is not None:
     col_f1, col_f2 = st.sidebar.columns(2)
     eff_flip_h = col_f1.checkbox("Flip Horizontal", value=False)
     eff_flip_v = col_f2.checkbox("Flip Vertikal", value=False)
-    
     eff_scale_val = st.sidebar.slider("Skala Efek Custom:", 0.2, 3.0, 1.0, 0.1)
     eff_dist_offset = st.sidebar.slider("Offset Jarak Efek:", -50, 80, 15, 1)
     eff_opacity_val = st.sidebar.slider("Transparansi (Opacity):", 0.1, 1.0, 0.9, 0.05)
@@ -257,67 +289,53 @@ if uploaded_file is not None:
     
     st.sidebar.markdown("---")
     st.sidebar.header("⚙️ 3. Tipe Senjata & Pengaturan Rotasi")
-    weapon_type = st.sidebar.selectbox(
-        "Kategori Senjata:",
-        ["⚔️ Broadsword / Sword", "🔱 Spear / Polearm", "🌙 Scythe / Axe (360° Spin)", "🪀 Yoyo Spin"]
-    )
-    
-    st.sidebar.markdown("**Atur Rotasi Senjata:**")
-    base_angle_val = st.sidebar.slider("Sudut Rotasi Awal/Base (°):", -180, 180, 45, help="Sudut awal pedang Terraria standar adalah 45°.")
-    swing_arc_range_val = st.sidebar.slider("Rentang Sudut Ayunan Tebasan (°):", 30, 240, 130, 5, help="Besarnya sudut tebasan dari awal hingga akhir ayunan.")
+    weapon_type = st.sidebar.selectbox("Kategori Senjata:", ["⚔️ Broadsword / Sword", "🔱 Spear / Polearm", "🌙 Scythe / Axe (360° Spin)", "🪀 Yoyo Spin"])
+    base_angle_val = st.sidebar.slider("Sudut Rotasi Awal/Base (°):", -180, 180, 45)
+    swing_arc_range_val = st.sidebar.slider("Rentang Sudut Ayunan Tebasan (°):", 30, 240, 130, 5)
 
     st.sidebar.markdown("---")
     st.sidebar.header("📐 4. Grip Pivot Position")
     preset_choice = st.sidebar.radio("Preset Pegangan Cepat:", ["Custom", "🗡️ Dagger/Shortsword", "⚔️ Broadsword", "🔱 Spear"])
-    
-    if preset_choice == "🗡️ Dagger/Shortsword":
-        def_x, def_y = 15, 85
-    elif preset_choice == "⚔️ Broadsword":
-        def_x, def_y = 25, 75
-    elif preset_choice == "🔱 Spear":
-        def_x, def_y = 40, 60
-    else:
-        def_x, def_y = 25, 75
+    if preset_choice == "🗡️ Dagger/Shortsword": def_x, def_y = 15, 85
+    elif preset_choice == "⚔️ Broadsword": def_x, def_y = 25, 75
+    elif preset_choice == "🔱 Spear": def_x, def_y = 40, 60
+    else: def_x, def_y = 25, 75
 
     pivot_x_pct = st.sidebar.slider("Grip Posisi X (%):", 0, 100, def_x)
     pivot_y_pct = st.sidebar.slider("Grip Posisi Y (%):", 0, 100, def_y)
     pivot_x_px = int((pivot_x_pct / 100.0) * src_image.width)
     pivot_y_px = int((pivot_y_pct / 100.0) * src_image.height)
-
     show_dummy_arm = st.sidebar.checkbox("Tampilkan Dummy Arm Karakter", value=True)
 
     st.sidebar.markdown("---")
     st.sidebar.header("🎨 5. Procedural Slash FX Generator")
-    slash_fx_style = st.sidebar.selectbox(
-        "Model Efek Tebasan Python:",
-        ["✨ Smooth Energy Arc", "🔥 Flame Wave", "❄️ Ice Crescent", "⚡ Laser Blade Sharp"]
-    )
-    arc_color = st.sidebar.color_picker("Warna Efek:", "#00FFFF")
-    arc_power = st.sidebar.slider("Intensitas Efek:", 0.0, 2.5, 1.2, 0.1)
+    slash_fx_style = st.sidebar.selectbox("Model Efek Tebasan Python:", ["✨ Smooth Energy Arc", "🔥 Flame Wave", "❄️ Ice Crescent", "⚡ Laser Blade Sharp"])
+    arc_color = st.sidebar.color_picker("Warna Efek Arc:", "#00FFFF")
+    arc_power = st.sidebar.slider("Intensitas Efek Arc:", 0.0, 2.5, 1.2, 0.1)
     arc_span_deg = st.sidebar.slider("Sudut Panjang Busur Arc (°):", 30, 180, 90, 5)
     arc_radius_val = st.sidebar.slider("Jangkauan Radius (% Canvas):", 20, 50, 42, 1) / 100.0
 
     st.sidebar.markdown("---")
-    st.sidebar.header("🖼️ 6. Pengaturan Layout Sprite Sheet")
-    sheet_orientation = st.sidebar.selectbox(
-        "Arah Susunan (Orientasi Layout):",
-        [
-            "Horizontal Grid (Kiri ke Kanan)",
-            "Vertical Grid (Atas ke Bawah)",
-            "Horizontal Strip (1 Baris Horizontal)",
-            "Vertical Strip (1 Kolom Vertikal)"
-        ]
-    )
+    st.sidebar.header("✨ 6. Particle & Dust Trail Engine")
+    enable_dust = st.sidebar.checkbox("Aktifkan Dust Trail FX", value=True)
+    particle_style = st.sidebar.selectbox("Model Dust Partikel:", ["✨ Magic Sparkles", "🔥 Fire Embers", "❄️ Ice Shards", "⚡ Electric Sparks", "🟢 Toxic Bubbles"])
+    particle_count = st.sidebar.slider("Kepadatan Dust Partikel:", 5, 50, 20)
+    particle_spread = st.sidebar.slider("Sebaran Dust Arc (°):", 10, 90, 45)
+    particle_color = st.sidebar.color_picker("Warna Dust Partikel:", "#00FFFF")
+
+    st.sidebar.markdown("---")
+    st.sidebar.header("🖼️ 7. Pengaturan Layout Sprite Sheet")
+    sheet_orientation = st.sidebar.selectbox("Arah Susunan (Orientasi Layout):", ["Horizontal Grid (Kiri ke Kanan)", "Vertical Grid (Atas ke Bawah)", "Horizontal Strip (1 Baris Horizontal)", "Vertical Strip (1 Kolom Vertikal)"])
     grid_limit = st.sidebar.slider("Jumlah Kolom/Baris Utama Grid:", 2, 8, 4) if "Grid" in sheet_orientation else 1
     padding_between_frames = st.sidebar.slider("Jarak Antar Frame (Padding Px):", 0, 16, 0)
 
     st.sidebar.markdown("---")
-    st.sidebar.header("🪄 7. Glowmask Generator")
+    st.sidebar.header("🪄 8. Glowmask Generator")
     enable_glowmask = st.sidebar.checkbox("Generate Glowmask", value=False)
     glow_threshold = st.sidebar.slider("Glow Threshold:", 50, 255, 180)
 
     st.sidebar.markdown("---")
-    st.sidebar.header("🎬 8. Frame Export Settings")
+    st.sidebar.header("🎬 9. Frame Export Settings")
     sheet_frames_count = st.sidebar.slider("Jumlah Frame Animasi:", 3, 12, 4)
     frame_canvas_size = st.sidebar.select_slider("Canvas Size per Frame (Px):", options=[64, 80, 96, 128], value=80)
 
@@ -360,12 +378,15 @@ if uploaded_file is not None:
             glow_base.save(buf_glow, format="PNG")
             st.download_button("💾 Download Glowmask PNG", data=buf_glow.getvalue(), file_name="Terraria_Item_Glow.png", mime="image/png", use_container_width=True)
 
-    # C# CODE GENERATOR
+    # C# CODE GENERATOR (WITH DUST MELEE EFFECTS)
     st.markdown("---")
-    st.subheader("💻 3. TModLoader C# Code Snippet")
+    st.subheader("💻 3. TModLoader C# Code Snippet (Dengan Dust Effect)")
     item_style = "ItemUseStyleID.Swing" if "Sword" in weapon_type or "Scythe" in weapon_type else ("ItemUseStyleID.Thrust" if "Spear" in weapon_type else "ItemUseStyleID.Shoot")
+    dust_id_map = {"✨ Magic Sparkles": "DustID.Electric", "🔥 Flame Wave": "DustID.Torch", "❄️ Ice Shards": "DustID.IceTorch", "⚡ Electric Sparks": "DustID.PurpleTorch", "🟢 Toxic Bubbles": "DustID.Acid"}
+    dust_type_str = dust_id_map.get(particle_style, "DustID.Electric")
     
-    csharp_code = f"""using Terraria;
+    csharp_code = f"""using Microsoft.Xna.Framework;
+using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
 
@@ -387,6 +408,26 @@ namespace YourModName.Items
             Item.value = Item.buyPrice(gold: 1);
             Item.rare = ItemRarityID.Green;
         }}
+
+        // Terraria Melee Dust Trail Effect
+        public override void MeleeEffects(Player player, Rectangle hitbox)
+        {{
+            if (Main.rand.NextBool(2))
+            {{
+                int dust = Dust.NewDust(
+                    new Vector2(hitbox.X, hitbox.Y), 
+                    hitbox.Width, 
+                    hitbox.Height, 
+                    {dust_type_str}, 
+                    player.velocity.X * 0.2f, 
+                    player.velocity.Y * 0.2f, 
+                    100, 
+                    default(Color), 
+                    1.2f
+                );
+                Main.dust[dust].noGravity = true;
+            }}
+        }}
     }}
 }}"""
     st.code(csharp_code, language="csharp")
@@ -394,7 +435,7 @@ namespace YourModName.Items
 
     # ANIMATED TRAJECTORY SHEET
     st.markdown("---")
-    st.subheader("🎬 4. Multi-Type Trajectory & Custom Slash FX Sheet")
+    st.subheader("🎬 4. Multi-Type Trajectory & Dust Trail Sheet")
     
     rendered_frames = [
         generate_weapon_frame(
@@ -402,6 +443,7 @@ namespace YourModName.Items
             base_angle_val, swing_arc_range_val, pivot_x_px, pivot_y_px, frame_canvas_size, 
             slash_fx_style, arc_color, arc_power, 
             arc_span_deg, arc_radius_val, 
+            particle_style, particle_count, particle_spread, particle_color, enable_dust,
             custom_eff_img, eff_rot_extra, eff_flip_h, eff_flip_v, eff_dist_offset, eff_scale_val, eff_opacity_val, show_dummy_arm
         )
         for idx in range(sheet_frames_count)
