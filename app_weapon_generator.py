@@ -8,7 +8,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Terraria Weapon Master Studio v9.1",
+    page_title="Terraria Weapon Master Studio v9.2",
     page_icon="🗡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -73,14 +73,13 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v9.1</div>
-    <div class="studio-subtitle">Studio Modding Terraria Pro: Sync Number Inputs + Sliders, 25+ Model Dust Particle Engine, Clean GIF Player, & Mod Exporter.</div>
+    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v9.2</div>
+    <div class="studio-subtitle">Studio Modding Terraria Pro: Smooth Fade-In/Out Engine, Sync Controls, 25+ Model Dust Particles, Clean GIF Player, & Mod Exporter.</div>
 </div>
 """, unsafe_allow_html=True)
 
-# 4. HELPER SYNC FUNCTION UNTUK SLIDER + NUMBER INPUT
+# 4. HELPER SYNC FUNCTION
 def sync_control(key_name, default_val, min_val, max_val, step_val, label_text):
-    """Fungsi pembantu yang menyinkronkan Slider dan Number Input secara 2-arah."""
     if key_name not in st.session_state:
         st.session_state[key_name] = default_val
 
@@ -99,8 +98,29 @@ def sync_control(key_name, default_val, min_val, max_val, step_val, label_text):
     st.session_state[key_name] = val_slide
     return st.session_state[key_name]
 
+# 5. FADE IN & FADE OUT ALPHA CALCULATOR
+def calculate_fade_multiplier(frame_idx, total_frames, fade_in_pct, fade_out_pct):
+    """Menghitung pengali transparansi (0.0 hingga 1.0) berdasarkan kurva Fade In & Fade Out."""
+    progress = frame_idx / float(max(1, total_frames - 1))
+    
+    fade_in_threshold = fade_in_pct / 100.0
+    fade_out_threshold = 1.0 - (fade_out_pct / 100.0)
+    
+    alpha_mult = 1.0
+    
+    # Process Fade In
+    if fade_in_threshold > 0 and progress < fade_in_threshold:
+        alpha_mult *= (progress / fade_in_threshold)
+        
+    # Process Fade Out
+    if fade_out_threshold < 1.0 and progress > fade_out_threshold:
+        fade_out_progress = (1.0 - progress) / (1.0 - fade_out_threshold)
+        alpha_mult *= max(0.0, fade_out_progress)
+        
+    return min(1.0, max(0.0, alpha_mult))
+
 # ==========================================
-# 5. CORE ENGINE FUNCTIONS
+# 6. CORE ENGINE FUNCTIONS
 # ==========================================
 def rotate_nearest_neighbor(image, angle):
     return image.rotate(angle, resample=Image.NEAREST, expand=True)
@@ -113,7 +133,7 @@ def generate_glowmask(image, threshold=200):
     img_np[mask, 3] = 0
     return Image.fromarray(img_np)
 
-def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range, p_style, p_count, p_color, p_seed, frame_idx, total_frames):
+def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range, p_style, p_count, p_color, p_seed, frame_idx, total_frames, fade_mult):
     layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
     center = canvas_size // 2
@@ -139,11 +159,12 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
             spawn_y = center + (base_radius + r_scatter) * math.sin(spawn_rad)
             drift_x = random.uniform(-4, 4) * age * 10
             
-            alpha = int(max(0, (1.0 - age) * 255))
+            base_alpha = max(0, (1.0 - age) * 255)
+            alpha = int(base_alpha * fade_mult) # Terapkan Smooth Fade
+            
             p_r = max(1, int((1.0 - age * 0.5) * random.uniform(2, 4)))
             px, py = spawn_x + drift_x, spawn_y + (-random.uniform(2, 8) * age * 10)
 
-            # --- 25 VARIATION PARTICLE LOGIC ---
             if p_style == "🔥 Fire Embers":
                 draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], fill=(255, int(max(0, 200 - age * 200)), 0, alpha))
             elif p_style == "✨ Magic Sparkles":
@@ -201,7 +222,7 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
     glow = layer.filter(ImageFilter.GaussianBlur(radius=2))
     return Image.alpha_composite(glow, layer)
 
-def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v, distance_offset, scale_val, opacity_val, canvas_size):
+def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v, distance_offset, scale_val, opacity_val, canvas_size, fade_mult):
     canvas_center = canvas_size // 2
     proc_eff = effect_img.copy()
     if flip_h: proc_eff = proc_eff.transpose(Image.FLIP_LEFT_RIGHT)
@@ -211,10 +232,12 @@ def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v
     new_h = max(1, int(proc_eff.height * scale_val))
     resized_effect = proc_eff.resize((new_w, new_h), resample=Image.NEAREST)
     
-    if opacity_val < 1.0:
-        eff_np = np.array(resized_effect).copy()
-        eff_np[:, :, 3] = (eff_np[:, :, 3] * opacity_val).astype(np.uint8)
-        resized_effect = Image.fromarray(eff_np)
+    # Smooth Fade Mult
+    final_opacity = max(0.0, min(1.0, opacity_val * fade_mult))
+    
+    eff_np = np.array(resized_effect).copy()
+    eff_np[:, :, 3] = (eff_np[:, :, 3] * final_opacity).astype(np.uint8)
+    resized_effect = Image.fromarray(eff_np)
         
     total_angle = angle + eff_extra_rot
     rotated_eff = rotate_nearest_neighbor(resized_effect, total_angle)
@@ -232,9 +255,12 @@ def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v
 
 def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_angle, swing_arc_range, pivot_x, pivot_y, canvas_size, 
                             p_style, p_count, p_color, enable_dust,
-                            custom_effect_img, eff_extra_rot, eff_flip_h, eff_flip_v, eff_offset, eff_scale, eff_opacity):
+                            custom_effect_img, eff_extra_rot, eff_flip_h, eff_flip_v, eff_offset, eff_scale, eff_opacity,
+                            fade_in_pct, fade_out_pct):
     frame = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     canvas_center = canvas_size // 2
+
+    fade_mult = calculate_fade_multiplier(frame_idx, total_frames, fade_in_pct, fade_out_pct)
 
     half_range = swing_arc_range / 2.0
     if w_type == "⚔️ Broadsword / Sword":
@@ -249,14 +275,14 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
     if custom_effect_img is not None:
         eff_layer = overlay_custom_effect_image(
             custom_effect_img, angle, eff_extra_rot, eff_flip_h, eff_flip_v, 
-            eff_offset, eff_scale, eff_opacity, canvas_size
+            eff_offset, eff_scale, eff_opacity, canvas_size, fade_mult
         )
         frame = Image.alpha_composite(frame, eff_layer)
 
     if enable_dust and w_type != "🔱 Spear / Polearm":
         dust_layer = render_advanced_dust_particles(
             canvas_size, base_rot_angle, swing_arc_range, p_style, p_count, p_color, 
-            p_seed=42, frame_idx=frame_idx, total_frames=total_frames
+            p_seed=42, frame_idx=frame_idx, total_frames=total_frames, fade_mult=fade_mult
         )
         frame = Image.alpha_composite(frame, dust_layer)
 
@@ -328,7 +354,7 @@ def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padd
     return sheet, cols, rows
 
 # ==========================================
-# 6. SIDEBAR CONTROLS (WITH DUAL SYNC INPUTS)
+# 7. SIDEBAR CONTROLS
 # ==========================================
 st.sidebar.markdown("### 📁 1. Sprite Input")
 uploaded_file = st.sidebar.file_uploader("Upload File Senjata PNG:", type=["png"])
@@ -367,7 +393,12 @@ if uploaded_file is not None:
     swing_arc_range_val = sync_control("swing_arc_range", 130, 30, 240, 5, "Rentang Sudut Tebasan (°)")
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🎯 4. Grip Pivot Position")
+    st.sidebar.markdown("### 📈 4. Smooth Fade In & Fade Out Engine")
+    fade_in_pct_val = sync_control("fade_in_pct", 20, 0, 50, 5, "Fade In Ratio (%)")
+    fade_out_pct_val = sync_control("fade_out_pct", 25, 0, 50, 5, "Fade Out Ratio (%)")
+
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🎯 5. Grip Pivot Position")
     preset_choice = st.sidebar.radio("Preset Pegangan Cepat:", ["Custom", "🗡️ Shortsword (15,85)", "⚔️ Broadsword (25,75)", "🔱 Spear (40,60)"])
     if preset_choice == "🗡️ Shortsword (15,85)": def_x, def_y = 15, 85
     elif preset_choice == "⚔️ Broadsword (25,75)": def_x, def_y = 25, 75
@@ -380,7 +411,7 @@ if uploaded_file is not None:
     pivot_y_px = int((pivot_y_pct / 100.0) * src_image.height)
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### ✨ 5. Pro Particle Dust Engine (25 Variations)")
+    st.sidebar.markdown("### ✨ 6. Pro Particle Dust Engine (25 Variations)")
     enable_dust = st.sidebar.checkbox("Aktifkan Dust FX", value=True)
     
     particle_options = [
@@ -395,24 +426,24 @@ if uploaded_file is not None:
     particle_color = st.sidebar.color_picker("Warna Partikel:", "#00FFFF")
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🖼️ 6. Sprite Sheet Layout")
+    st.sidebar.markdown("### 🖼️ 7. Sprite Sheet Layout")
     sheet_orientation = st.sidebar.selectbox("Arah Layout Grid:", ["Horizontal Grid (Kiri ke Kanan)", "Vertical Grid (Atas ke Bawah)", "Horizontal Strip (1 Baris Horizontal)", "Vertical Strip (1 Kolom Vertikal)"])
     grid_limit = sync_control("grid_limit", 4, 2, 8, 1, "Jumlah Kolom/Baris Grid") if "Grid" in sheet_orientation else 1
     padding_between_frames = sync_control("padding_frames", 0, 0, 16, 1, "Padding Antar Frame (Px)")
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🪄 7. Glowmask Generator")
+    st.sidebar.markdown("### 🪄 8. Glowmask Generator")
     enable_glowmask = st.sidebar.checkbox("Generate Glowmask", value=False)
     glow_threshold = sync_control("glow_thresh", 180, 50, 255, 5, "Threshold Glow")
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🎬 8. Export & Preview Settings")
+    st.sidebar.markdown("### 🎬 9. Export & Preview Settings")
     sheet_frames_count = sync_control("sheet_frames", 6, 3, 16, 1, "Jumlah Frame Animasi")
     frame_canvas_size = st.sidebar.select_slider("Resolusi Canvas (Px):", options=[64, 80, 96, 128], value=80)
     anim_fps = sync_control("anim_fps", 10, 5, 30, 1, "Frame Rate Preview (FPS)")
 
     # ==========================================
-    # 7. MAIN STUDIO DASHBOARD VIEW
+    # 8. MAIN STUDIO DASHBOARD VIEW
     # ==========================================
     col_v1, col_v2, col_v3 = st.columns([1, 1, 1])
 
@@ -434,13 +465,14 @@ if uploaded_file is not None:
         rotated_base.save(buf_rot, format="PNG")
         st.download_button(f"💾 Download PNG ({base_angle_val}°)", data=buf_rot.getvalue(), file_name=f"Terraria_Item_{base_angle_val}deg.png", mime="image/png", use_container_width=True)
 
-    # RENDER ANIMATION FRAMES
+    # RENDER ANIMATION FRAMES (WITH SMOOTH FADE)
     rendered_frames = [
         generate_weapon_frame(
             src_image, weapon_type, idx, sheet_frames_count, 
             base_angle_val, swing_arc_range_val, pivot_x_px, pivot_y_px, frame_canvas_size, 
             particle_style, particle_count, particle_color, enable_dust,
-            custom_eff_img, eff_rot_extra, eff_flip_h, eff_flip_v, eff_dist_offset, eff_scale_val, eff_opacity_val
+            custom_eff_img, eff_rot_extra, eff_flip_h, eff_flip_v, eff_dist_offset, eff_scale_val, eff_opacity_val,
+            fade_in_pct_val, fade_out_pct_val
         )
         for idx in range(sheet_frames_count)
     ]
@@ -460,7 +492,7 @@ if uploaded_file is not None:
         )
         gif_bytes = gif_bytes_io.getvalue()
         
-        st.image(gif_bytes, caption=f"Loop Preview ({anim_fps} FPS)", use_container_width=True)
+        st.image(gif_bytes, caption=f"Smooth Loop Preview ({anim_fps} FPS)", use_container_width=True)
         st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name="Terraria_Weapon_Swing_Animation.gif", mime="image/gif", use_container_width=True)
 
     # C# CODE SNIPPET SECTION
