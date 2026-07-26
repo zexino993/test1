@@ -6,13 +6,106 @@ import math
 import random
 import zipfile
 
-st.set_page_config(page_title="Terraria Weapon Master Studio v8.0", layout="wide")
+# 1. PAGE CONFIG
+st.set_page_config(
+    page_title="Terraria Weapon Master Studio v9.0 Pro",
+    page_icon="🗡️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-st.title("🗡️ Terraria Weapon Master Studio v8.0 (Clean Animation Edition)")
-st.caption("Studio Modder Terraria: Clean Swing Preview, Pro Particle Dust Engine, Custom Rotation, Sprite Sheet Layout, & ZIP Package Exporter!")
+# 2. CUSTOM PREMIUM CSS (DARK GLASSMORPHISM STUDIO THEME)
+st.markdown("""
+<style>
+    /* Dark Gradient Background */
+    .stApp {
+        background: linear-gradient(135deg, #0d0b18 0%, #161224 50%, #0a0813 100%);
+        color: #e2e8f0;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    
+    /* Studio Header Banner */
+    .studio-header {
+        background: linear-gradient(90deg, rgba(138, 43, 226, 0.15) 0%, rgba(0, 255, 255, 0.15) 100%);
+        border: 1px solid rgba(212, 165, 255, 0.2);
+        backdrop-filter: blur(10px);
+        padding: 24px;
+        border-radius: 16px;
+        margin-bottom: 24px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+    
+    .studio-title {
+        font-size: 2.2rem;
+        font-weight: 800;
+        background: linear-gradient(90deg, #a5b4fc, #c084fc, #38bdf8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 0;
+    }
+    
+    .studio-subtitle {
+        color: #94a3b8;
+        font-size: 0.95rem;
+        margin-top: 6px;
+    }
+
+    /* Glassmorphism Cards */
+    div[data-testid="stMetricValue"] {
+        color: #38bdf8 !important;
+    }
+    
+    .glass-card {
+        background: rgba(23, 18, 38, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(12px);
+        border-radius: 14px;
+        padding: 18px;
+        margin-bottom: 18px;
+    }
+    
+    /* Neon Glow Buttons */
+    .stButton > button, .stDownloadButton > button {
+        background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%) !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 10px !important;
+        font-weight: 700 !important;
+        padding: 10px 20px !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3) !important;
+    }
+    
+    .stButton > button:hover, .stDownloadButton > button:hover {
+        transform: translateY(-2px) scale(1.02) !important;
+        box-shadow: 0 8px 25px rgba(168, 85, 247, 0.6) !important;
+        filter: brightness(1.1) !important;
+    }
+
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        background-color: #090712 !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
+    
+    /* Section Divider Line */
+    hr {
+        border-color: rgba(255, 255, 255, 0.08) !important;
+        margin: 28px 0 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# 3. STUDIO HEADER BANNER
+st.markdown("""
+<div class="studio-header">
+    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v9.0</div>
+    <div class="studio-subtitle">Studio Modding Terraria Pro: Auto 45° Rotator, Interactive Pivot Inspector, Clean Animated GIF Engine, Pro Particle Dust Engine, & All-in-One Mod Exporter.</div>
+</div>
+""", unsafe_allow_html=True)
 
 # ==========================================
-# 1. HELPER & ADVANCED PARTICLE ENGINE
+# 4. ENGINE CORE FUNCTIONS
 # ==========================================
 def rotate_nearest_neighbor(image, angle):
     return image.rotate(angle, resample=Image.NEAREST, expand=True)
@@ -26,7 +119,6 @@ def generate_glowmask(image, threshold=200):
     return Image.fromarray(img_np)
 
 def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range, p_style, p_count, p_color, p_seed, frame_idx, total_frames):
-    """Sistem Partikel Lanjutan dengan Jejak Waktu (Temporal Trailing & Fade)."""
     layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
     center = canvas_size // 2
@@ -43,22 +135,17 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
     for i in range(p_count):
         birth_progress = random.uniform(0.0, 1.0)
         
-        # Hanya tampilkan partikel yang sudah terlahir di timeline swing
         if swing_progress >= birth_progress:
-            age = (swing_progress - birth_progress) # Rentang umur (0.0 - 1.0)
-            
-            # Hitung sudut lahir di sepanjang ayunan
+            age = (swing_progress - birth_progress)
             angle_at_birth = (half_range - birth_progress * swing_arc_range) + base_rot_angle
             spawn_rad = math.radians(-angle_at_birth)
             
-            # Sebaran posisi lahir
             r_scatter = random.uniform(-6, 6)
             spawn_x = center + (base_radius + r_scatter) * math.cos(spawn_rad)
             spawn_y = center + (base_radius + r_scatter) * math.sin(spawn_rad)
             
             drift_x = random.uniform(-4, 4) * age * 10
             
-            # 1. 🔥 FIRE EMBERS
             if p_style == "🔥 Fire Embers":
                 drift_y = -random.uniform(5, 12) * age * 12
                 p_r = max(1, int((1.0 - age * 0.7) * random.uniform(2, 5)))
@@ -68,7 +155,6 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
                     fill=(255, int(max(0, 200 - age * 200)), 0, alpha)
                 )
 
-            # 2. ✨ MAGIC SPARKLES
             elif p_style == "✨ Magic Sparkles":
                 drift_y = random.uniform(-3, 3) * age * 8
                 p_r = max(1, int((1.0 - age * 0.5) * random.uniform(2, 4)))
@@ -78,7 +164,6 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
                 draw.line([(px, py - p_r * 2), (px, py + p_r * 2)], fill=(r_c, g_c, b_c, alpha), width=1)
                 draw.rectangle([px - 1, py - 1, px + 1, py + 1], fill=(255, 255, 255, alpha))
 
-            # 3. ⚡ ELECTRIC SPARKS
             elif p_style == "⚡ Electric Sparks":
                 drift_y = random.uniform(-6, 6) * age * 8
                 alpha = int(max(0, (1.0 - age * 1.2) * 255))
@@ -87,7 +172,6 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
                 dx2, dy2 = dx1 + random.randint(-4, 4), dy1 + random.randint(-4, 4)
                 draw.line([(px, py), (px + dx1, py + dy1), (px + dx2, py + dy2)], fill=(r_c, g_c, 255, alpha), width=1)
 
-            # 4. ❄️ ICE CRYSTALS
             elif p_style == "❄️ Ice Crystals":
                 drift_y = random.uniform(2, 8) * age * 8
                 p_r = max(1, int((1.0 - age * 0.4) * random.uniform(2, 4)))
@@ -95,7 +179,6 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
                 px, py = spawn_x + drift_x, spawn_y + drift_y
                 draw.polygon([(px, py - p_r), (px + p_r, py), (px, py + p_r), (px - p_r, py)], fill=(200, 240, 255, alpha))
 
-            # 5. 🟢 TOXIC SLIME BUBBLES
             else:
                 drift_y = random.uniform(3, 10) * age * 10
                 p_r = max(1, int((1.0 - age * 0.3) * random.uniform(2, 5)))
@@ -149,10 +232,9 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
         angle = (frame_idx / float(total_frames)) * 360 + base_rot_angle
     elif w_type == "🪀 Yoyo Spin":
         angle = (frame_idx / float(total_frames)) * 180 + base_rot_angle
-    else: # Spear
+    else:
         angle = base_rot_angle
 
-    # 1. Overlay Custom PNG Effect (Jika Diunggah)
     if custom_effect_img is not None:
         eff_layer = overlay_custom_effect_image(
             custom_effect_img, angle, eff_extra_rot, eff_flip_h, eff_flip_v, 
@@ -160,7 +242,6 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
         )
         frame = Image.alpha_composite(frame, eff_layer)
 
-    # 2. Overlay Advanced Dust Particles
     if enable_dust and w_type != "🔱 Spear / Polearm":
         dust_layer = render_advanced_dust_particles(
             canvas_size, base_rot_angle, swing_arc_range, p_style, p_count, p_color, 
@@ -168,7 +249,6 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
         )
         frame = Image.alpha_composite(frame, dust_layer)
 
-    # 3. Render Main Weapon
     if w_type == "🔱 Spear / Polearm":
         thrust_dist = np.sin((frame_idx / float(max(1, total_frames - 1))) * math.pi) * (canvas_size * 0.25)
         rotated = rotate_nearest_neighbor(weapon_img, base_rot_angle)
@@ -207,7 +287,7 @@ def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padd
     elif orientation == "Horizontal Strip (1 Baris Horizontal)":
         cols = num_frames
         rows = 1
-    else: # Vertical Strip
+    else:
         cols = 1
         rows = num_frames
 
@@ -226,7 +306,7 @@ def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padd
         elif orientation == "Horizontal Strip (1 Baris Horizontal)":
             r = 0
             c = idx
-        else: # Vertical Strip
+        else:
             r = idx
             c = 0
             
@@ -237,25 +317,24 @@ def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padd
     return sheet, cols, rows
 
 # ==========================================
-# 2. SIDEBAR CONTROLS
+# 5. SIDEBAR CONTROLS
 # ==========================================
-st.sidebar.header("📁 1. Input Sprite Senjata")
-uploaded_file = st.sidebar.file_uploader("Upload PNG Senjata Utama:", type=["png"])
+st.sidebar.markdown("### 📁 1. Sprite Input")
+uploaded_file = st.sidebar.file_uploader("Upload File Senjata PNG:", type=["png"])
 
 st.sidebar.markdown("---")
-st.sidebar.header("✨ 2. Custom Image Swing Effect (Opsional)")
-uploaded_effect = st.sidebar.file_uploader("Upload PNG Efek External:", type=["png"])
+st.sidebar.markdown("### ✨ 2. Custom Image FX (Opsional)")
+uploaded_effect = st.sidebar.file_uploader("Upload Efek External PNG:", type=["png"])
 
 if uploaded_effect is not None:
     custom_eff_img = Image.open(uploaded_effect).convert("RGBA")
-    st.sidebar.markdown("**Transformasi & Rotasi Efek Custom:**")
     eff_rot_extra = st.sidebar.slider("Rotasi Ekstra Efek (°):", -180, 180, 0)
     col_f1, col_f2 = st.sidebar.columns(2)
-    eff_flip_h = col_f1.checkbox("Flip Horizontal", value=False)
-    eff_flip_v = col_f2.checkbox("Flip Vertikal", value=False)
-    eff_scale_val = st.sidebar.slider("Skala Efek Custom:", 0.2, 3.0, 1.0, 0.1)
-    eff_dist_offset = st.sidebar.slider("Offset Jarak Efek:", -50, 80, 15, 1)
-    eff_opacity_val = st.sidebar.slider("Transparansi (Opacity):", 0.1, 1.0, 0.9, 0.05)
+    eff_flip_h = col_f1.checkbox("Flip H", value=False)
+    eff_flip_v = col_f2.checkbox("Flip V", value=False)
+    eff_scale_val = st.sidebar.slider("Skala Efek:", 0.2, 3.0, 1.0, 0.1)
+    eff_dist_offset = st.sidebar.slider("Offset Jarak:", -50, 80, 15, 1)
+    eff_opacity_val = st.sidebar.slider("Transparansi:", 0.1, 1.0, 0.9, 0.05)
 else:
     custom_eff_img = None
     eff_rot_extra = 0
@@ -269,13 +348,13 @@ if uploaded_file is not None:
     src_image = Image.open(uploaded_file).convert("RGBA")
     
     st.sidebar.markdown("---")
-    st.sidebar.header("⚙️ 3. Tipe Senjata & Pengaturan Rotasi")
+    st.sidebar.markdown("### ⚙️ 3. Tipe & Rotasi Senjata")
     weapon_type = st.sidebar.selectbox("Kategori Senjata:", ["⚔️ Broadsword / Sword", "🔱 Spear / Polearm", "🌙 Scythe / Axe (360° Spin)", "🪀 Yoyo Spin"])
-    base_angle_val = st.sidebar.slider("Sudut Rotasi Awal/Base (°):", -180, 180, 45)
-    swing_arc_range_val = st.sidebar.slider("Rentang Sudut Ayunan Tebasan (°):", 30, 240, 130, 5)
+    base_angle_val = st.sidebar.slider("Sudut Rotasi Awal Base (°):", -180, 180, 45)
+    swing_arc_range_val = st.sidebar.slider("Rentang Sudut Tebasan (°):", 30, 240, 130, 5)
 
     st.sidebar.markdown("---")
-    st.sidebar.header("📐 4. Grip Pivot Position")
+    st.sidebar.markdown("### 🎯 4. Grip Pivot Position")
     preset_choice = st.sidebar.radio("Preset Pegangan Cepat:", ["Custom", "🗡️ Dagger/Shortsword", "⚔️ Broadsword", "🔱 Spear"])
     if preset_choice == "🗡️ Dagger/Shortsword": def_x, def_y = 15, 85
     elif preset_choice == "⚔️ Broadsword": def_x, def_y = 25, 75
@@ -288,53 +367,53 @@ if uploaded_file is not None:
     pivot_y_px = int((pivot_y_pct / 100.0) * src_image.height)
 
     st.sidebar.markdown("---")
-    st.sidebar.header("✨ 5. Pro Particle & Dust Trail Engine")
-    enable_dust = st.sidebar.checkbox("Aktifkan Dust Trail FX", value=True)
+    st.sidebar.markdown("### ✨ 5. Pro Particle Dust Engine")
+    enable_dust = st.sidebar.checkbox("Aktifkan Dust FX", value=True)
     particle_style = st.sidebar.selectbox("Model Dust Partikel:", ["✨ Magic Sparkles", "🔥 Fire Embers", "❄️ Ice Crystals", "⚡ Electric Sparks", "🟢 Toxic Slime Bubbles"])
-    particle_count = st.sidebar.slider("Kepadatan Dust Partikel:", 5, 50, 25)
-    particle_color = st.sidebar.color_picker("Warna Dust Partikel:", "#00FFFF")
+    particle_count = st.sidebar.slider("Kepadatan Partikel:", 5, 50, 25)
+    particle_color = st.sidebar.color_picker("Warna Partikel:", "#00FFFF")
 
     st.sidebar.markdown("---")
-    st.sidebar.header("🖼️ 6. Pengaturan Layout Sprite Sheet")
-    sheet_orientation = st.sidebar.selectbox("Arah Susunan (Orientasi Layout):", ["Horizontal Grid (Kiri ke Kanan)", "Vertical Grid (Atas ke Bawah)", "Horizontal Strip (1 Baris Horizontal)", "Vertical Strip (1 Kolom Vertikal)"])
-    grid_limit = st.sidebar.slider("Jumlah Kolom/Baris Utama Grid:", 2, 8, 4) if "Grid" in sheet_orientation else 1
-    padding_between_frames = st.sidebar.slider("Jarak Antar Frame (Padding Px):", 0, 16, 0)
+    st.sidebar.markdown("### 🖼️ 6. Sprite Sheet Layout")
+    sheet_orientation = st.sidebar.selectbox("Arah Layout Grid:", ["Horizontal Grid (Kiri ke Kanan)", "Vertical Grid (Atas ke Bawah)", "Horizontal Strip (1 Baris Horizontal)", "Vertical Strip (1 Kolom Vertikal)"])
+    grid_limit = st.sidebar.slider("Jumlah Kolom/Baris Grid:", 2, 8, 4) if "Grid" in sheet_orientation else 1
+    padding_between_frames = st.sidebar.slider("Padding Antar Frame (Px):", 0, 16, 0)
 
     st.sidebar.markdown("---")
-    st.sidebar.header("🪄 7. Glowmask Generator")
+    st.sidebar.markdown("### 🪄 7. Glowmask Generator")
     enable_glowmask = st.sidebar.checkbox("Generate Glowmask", value=False)
-    glow_threshold = st.sidebar.slider("Glow Threshold:", 50, 255, 180)
+    glow_threshold = st.sidebar.slider("Threshold Glow:", 50, 255, 180)
 
     st.sidebar.markdown("---")
-    st.sidebar.header("🎬 8. Frame Export Settings")
+    st.sidebar.markdown("### 🎬 8. Export & Preview FPS")
     sheet_frames_count = st.sidebar.slider("Jumlah Frame Animasi:", 3, 12, 6)
-    frame_canvas_size = st.sidebar.select_slider("Canvas Size per Frame (Px):", options=[64, 80, 96, 128], value=80)
-    anim_fps = st.select_slider("Kecepatan Preview Animasi (FPS):", options=[5, 8, 10, 12, 15, 20], value=10)
+    frame_canvas_size = st.sidebar.select_slider("Resolusi Canvas (Px):", options=[64, 80, 96, 128], value=80)
+    anim_fps = st.select_slider("Frame Rate Preview (FPS):", options=[5, 8, 10, 12, 15, 20], value=10)
 
     # ==========================================
-    # 3. MAIN DASHBOARD VIEW
+    # 6. MAIN STUDIO DASHBOARD VIEW
     # ==========================================
-    col1, col2 = st.columns([1, 1])
+    col_v1, col_v2, col_v3 = st.columns([1, 1, 1])
 
-    with col1:
-        st.subheader("🎯 1. Pivot Inspection & Hitbox")
+    with col_v1:
+        st.markdown("##### 🎯 1. Pivot Crosshair Inspector")
         pivot_inspect_img = src_image.copy()
         draw_insp = ImageDraw.Draw(pivot_inspect_img)
         cs = 4
         draw_insp.line([(pivot_x_px - cs, pivot_y_px), (pivot_x_px + cs, pivot_y_px)], fill=(255, 0, 0, 255), width=2)
         draw_insp.line([(pivot_x_px, pivot_y_px - cs), (pivot_x_px, pivot_y_px + cs)], fill=(255, 0, 0, 255), width=2)
-        st.image(pivot_inspect_img, caption=f"Original Sprite ({src_image.width}x{src_image.height} px)", use_container_width=True)
+        st.image(pivot_inspect_img, caption=f"Original ({src_image.width}x{src_image.height} px)", use_container_width=True)
 
-    with col2:
-        st.subheader(f"⚔️ 2. Hasil Rotasi ({base_angle_val}°)")
+    with col_v2:
+        st.subheader(f"⚔️ 2. Rotasi ({base_angle_val}°)")
         rotated_base = rotate_nearest_neighbor(src_image, base_angle_val)
-        st.image(rotated_base, caption=f"Ready Sprite {base_angle_val}° ({rotated_base.width}x{rotated_base.height} px)", use_container_width=True)
+        st.image(rotated_base, caption=f"Ready Sprite ({rotated_base.width}x{rotated_base.height} px)", use_container_width=True)
         
         buf_rot = io.BytesIO()
         rotated_base.save(buf_rot, format="PNG")
-        st.download_button(f"💾 Download PNG Senjata ({base_angle_val}°)", data=buf_rot.getvalue(), file_name=f"Terraria_Item_{base_angle_val}deg.png", mime="image/png", use_container_width=True)
+        st.download_button(f"💾 Download PNG ({base_angle_val}°)", data=buf_rot.getvalue(), file_name=f"Terraria_Item_{base_angle_val}deg.png", mime="image/png", use_container_width=True)
 
-    # RENDER ANIMATION FRAMES (CLEAN RENDERING)
+    # RENDER ANIMATION FRAMES
     rendered_frames = [
         generate_weapon_frame(
             src_image, weapon_type, idx, sheet_frames_count, 
@@ -345,13 +424,8 @@ if uploaded_file is not None:
         for idx in range(sheet_frames_count)
     ]
 
-    # LIVE ANIMATED PREVIEW (GIF PLAYER)
-    st.markdown("---")
-    col_anim1, col_anim2 = st.columns([1, 1])
-
-    with col_anim1:
-        st.subheader("🎬 3. Live Animated Swing Preview")
-        
+    with col_v3:
+        st.subheader("🎬 3. Live GIF Preview")
         gif_bytes_io = io.BytesIO()
         frame_delay = int(1000 / anim_fps)
         rendered_frames[0].save(
@@ -365,16 +439,17 @@ if uploaded_file is not None:
         )
         gif_bytes = gif_bytes_io.getvalue()
         
-        st.image(gif_bytes, caption=f"Clean Live Loop Preview ({anim_fps} FPS)", use_container_width=True)
-        st.download_button("💾 Download Animated GIF Preview (.gif)", data=gif_bytes, file_name="Terraria_Weapon_Swing_Animation.gif", mime="image/gif", use_container_width=True)
+        st.image(gif_bytes, caption=f"Loop Preview ({anim_fps} FPS)", use_container_width=True)
+        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name="Terraria_Weapon_Swing_Animation.gif", mime="image/gif", use_container_width=True)
 
-    with col_anim2:
-        st.subheader("💻 4. TModLoader C# Code Snippet")
-        item_style = "ItemUseStyleID.Swing" if "Sword" in weapon_type or "Scythe" in weapon_type else ("ItemUseStyleID.Thrust" if "Spear" in weapon_type else "ItemUseStyleID.Shoot")
-        dust_id_map = {"✨ Magic Sparkles": "DustID.Electric", "🔥 Fire Embers": "DustID.Torch", "❄️ Ice Crystals": "DustID.IceTorch", "⚡ Electric Sparks": "DustID.PurpleTorch", "🟢 Toxic Slime Bubbles": "DustID.Acid"}
-        dust_type_str = dust_id_map.get(particle_style, "DustID.Electric")
-        
-        csharp_code = f"""using Microsoft.Xna.Framework;
+    # C# CODE SNIPPET SECTION
+    st.markdown("---")
+    st.markdown("### 💻 4. TModLoader C# Code Generator")
+    item_style = "ItemUseStyleID.Swing" if "Sword" in weapon_type or "Scythe" in weapon_type else ("ItemUseStyleID.Thrust" if "Spear" in weapon_type else "ItemUseStyleID.Shoot")
+    dust_id_map = {"✨ Magic Sparkles": "DustID.Electric", "🔥 Fire Embers": "DustID.Torch", "❄️ Ice Crystals": "DustID.IceTorch", "⚡ Electric Sparks": "DustID.PurpleTorch", "🟢 Toxic Slime Bubbles": "DustID.Acid"}
+    dust_type_str = dust_id_map.get(particle_style, "DustID.Electric")
+    
+    csharp_code = f"""using Microsoft.Xna.Framework;
 using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
@@ -419,28 +494,28 @@ namespace YourModName.Items
         }}
     }}
 }}"""
-        st.code(csharp_code, language="csharp")
-        st.download_button("💾 Download Script C# (.cs)", data=csharp_code, file_name="CustomWeapon.cs", mime="text/plain", use_container_width=True)
+    st.code(csharp_code, language="csharp")
+    st.download_button("💾 Download Script C# (.cs)", data=csharp_code, file_name="CustomWeapon.cs", mime="text/plain", use_container_width=False)
 
     # GLOWMASK SECTION
     glow_base = None
     if enable_glowmask:
         st.markdown("---")
-        st.subheader("🪄 Glowmask Texture (`Item_Glow.png`)")
+        st.markdown("### 🪄 Glowmask Texture (`Item_Glow.png`)")
         col_g1, col_g2 = st.columns([1, 1])
         glow_img = generate_glowmask(src_image, threshold=glow_threshold)
         glow_base = rotate_nearest_neighbor(glow_img, base_angle_val)
         
         with col_g1:
-            st.image(glow_base, caption="Glowmask Only (Bagian Menyala)", use_container_width=True)
+            st.image(glow_base, caption="Glowmask Only (Tekstur Menyala)", use_container_width=True)
         with col_g2:
             buf_glow = io.BytesIO()
             glow_base.save(buf_glow, format="PNG")
             st.download_button("💾 Download Glowmask PNG", data=buf_glow.getvalue(), file_name="Terraria_Item_Glow.png", mime="image/png", use_container_width=True)
 
-    # SPRITE SHEET DISPLAY & EXPORT
+    # SPRITE SHEET SECTION
     st.markdown("---")
-    st.subheader("🖼️ 5. Frame Inspection & Custom Layout Sprite Sheet")
+    st.markdown("### 🖼️ 5. Frame Inspection & Custom Layout Sprite Sheet")
     
     cols_ui = st.columns(min(6, len(rendered_frames)))
     for i, frm in enumerate(rendered_frames):
@@ -450,16 +525,16 @@ namespace YourModName.Items
         rendered_frames, frame_canvas_size, sheet_orientation, grid_limit, padding_between_frames
     )
 
-    st.markdown(f"#### Layout Grid Sprite Sheet ({final_cols} Kolom x {final_rows} Baris):")
-    st.image(sprite_sheet, caption=f"Sprite Sheet PNG ({sprite_sheet.width}x{sprite_sheet.height} px) - Orientasi: {sheet_orientation}", use_container_width=False)
+    st.markdown(f"#### Grid Layout Sprite Sheet ({final_cols} Kolom x {final_rows} Baris):")
+    st.image(sprite_sheet, caption=f"Sprite Sheet PNG ({sprite_sheet.width}x{sprite_sheet.height} px) - Layout: {sheet_orientation}", use_container_width=False)
 
     buf_sheet = io.BytesIO()
     sprite_sheet.save(buf_sheet, format="PNG")
     st.download_button("💾 Download Sprite Sheet PNG", data=buf_sheet.getvalue(), file_name="Terraria_Weapon_SwingSheet.png", mime="image/png", use_container_width=True)
 
-    # ALL-IN-ONE ZIP PACKAGE EXPORTER
+    # ZIP EXPORTER SECTION
     st.markdown("---")
-    st.subheader("📦 6. Export Complete Mod Package (ZIP)")
+    st.markdown("### 📦 6. Export Complete Mod Package (.ZIP)")
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
@@ -473,4 +548,4 @@ namespace YourModName.Items
     st.download_button("📦 Download Complete Mod Package (.ZIP)", data=zip_buffer.getvalue(), file_name="Terraria_Mod_Weapon_Package.zip", mime="application/zip", use_container_width=True)
 
 else:
-    st.info("👈 Silakan unggah file gambar PNG senjata milikmu di menu sebelah kiri untuk memulai!")
+    st.info("👈 Silakan unggah file gambar PNG senjata milikmu di menu sebelah kiri untuk memulai studio!")
