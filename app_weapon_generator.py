@@ -8,7 +8,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Terraria Weapon Master Studio v11.0",
+    page_title="Terraria Weapon Master Studio v12.0",
     page_icon="🗡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -73,8 +73,8 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v11.0</div>
-    <div class="studio-subtitle">Studio Modding Terraria Pro: FX Only Export Mode (Swing Trail Without Weapon), Anti-Crop Canvas, & Mod Exporter.</div>
+    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v12.0</div>
+    <div class="studio-subtitle">Studio Modding Terraria Pro: Multi-Layer Particle Engine (Up to 3 Custom/Preset Layers), FX-Only Export, Anti-Crop Canvas, & Mod Package Exporter.</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -130,11 +130,8 @@ def generate_glowmask(image, threshold=200):
     img_np[mask, 3] = 0
     return Image.fromarray(img_np)
 
-def render_advanced_dust_particles(canvas_size, weapon_radius, base_rot_angle, swing_arc_range, p_style, p_count, p_color, p_seed, frame_idx, total_frames, fade_mult, custom_part_img, custom_part_scale):
-    layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(layer)
+def render_single_particle_layer(draw, layer_canvas, canvas_size, weapon_radius, base_rot_angle, swing_arc_range, p_style, p_count, p_color, p_seed, frame_idx, total_frames, fade_mult, custom_part_img, custom_part_scale):
     center = canvas_size // 2
-    
     c_hex = p_color.lstrip('#')
     r_c, g_c, b_c = int(c_hex[0:2], 16), int(c_hex[2:4], 16), int(c_hex[4:6], 16)
     
@@ -162,6 +159,7 @@ def render_advanced_dust_particles(canvas_size, weapon_radius, base_rot_angle, s
             p_r = max(1, int((1.0 - age * 0.5) * random.uniform(2, 4)))
             px, py = spawn_x + drift_x, spawn_y + (-random.uniform(2, 8) * age * 10)
 
+            # --- CUSTOM PNG PARTICLE RENDERING ---
             if p_style == "📁 Custom PNG Particle" and custom_part_img is not None:
                 scale_factor = (1.0 - age * 0.4) * custom_part_scale
                 w_p = max(1, int(custom_part_img.width * scale_factor))
@@ -176,8 +174,9 @@ def render_advanced_dust_particles(canvas_size, weapon_radius, base_rot_angle, s
                 rot_deg = random.randint(0, 360)
                 rotated_p = rotate_nearest_neighbor(resized_p, rot_deg)
                 
-                layer.paste(rotated_p, (int(px - rotated_p.width // 2), int(py - rotated_p.height // 2)), rotated_p)
+                layer_canvas.paste(rotated_p, (int(px - rotated_p.width // 2), int(py - rotated_p.height // 2)), rotated_p)
 
+            # --- PROCEDURAL PRESET PARTICLES ---
             elif p_style == "🔥 Fire Embers":
                 draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], fill=(255, int(max(0, 200 - age * 200)), 0, alpha))
             elif p_style == "✨ Magic Sparkles":
@@ -232,8 +231,39 @@ def render_advanced_dust_particles(canvas_size, weapon_radius, base_rot_angle, s
             else: 
                 draw.polygon([(px - 2, py), (px, py - 2), (px + 2, py), (px, py + 3)], fill=(255, 105, 180, alpha))
 
-    glow = layer.filter(ImageFilter.GaussianBlur(radius=2))
-    return Image.alpha_composite(glow, layer)
+def render_multi_particle_engine(canvas_size, weapon_radius, base_rot_angle, swing_arc_range, particle_layers, frame_idx, total_frames, fade_mult):
+    master_layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+    
+    for idx, p_cfg in enumerate(particle_layers):
+        if not p_cfg.get("enabled", True):
+            continue
+            
+        layer_canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(layer_canvas)
+        
+        render_single_particle_layer(
+            draw=draw,
+            layer_canvas=layer_canvas,
+            canvas_size=canvas_size,
+            weapon_radius=weapon_radius,
+            base_rot_angle=base_rot_angle,
+            swing_arc_range=swing_arc_range,
+            p_style=p_cfg["style"],
+            p_count=p_cfg["count"],
+            p_color=p_cfg["color"],
+            p_seed=42 + idx * 99,
+            frame_idx=frame_idx,
+            total_frames=total_frames,
+            fade_mult=fade_mult,
+            custom_part_img=p_cfg.get("custom_img", None),
+            custom_part_scale=p_cfg.get("custom_scale", 1.0)
+        )
+        
+        glow = layer_canvas.filter(ImageFilter.GaussianBlur(radius=2))
+        combined = Image.alpha_composite(glow, layer_canvas)
+        master_layer = Image.alpha_composite(master_layer, combined)
+
+    return master_layer
 
 def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v, distance_offset, scale_val, opacity_val, canvas_size, fade_mult):
     canvas_center = canvas_size // 2
@@ -266,10 +296,9 @@ def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v
     return layer
 
 def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_angle, swing_arc_range, pivot_x, pivot_y, canvas_size, 
-                            p_style, p_count, p_color, enable_dust,
+                            particle_layers, enable_dust,
                             custom_effect_img, eff_extra_rot, eff_flip_h, eff_flip_v, eff_offset, eff_scale, eff_opacity,
-                            fade_in_pct, fade_out_pct, custom_part_img, custom_part_scale, weapon_radius,
-                            render_mode):
+                            fade_in_pct, fade_out_pct, weapon_radius, render_mode):
     frame = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     canvas_center = canvas_size // 2
 
@@ -293,16 +322,15 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
         )
         frame = Image.alpha_composite(frame, eff_layer)
 
-    # 2. Overlay Advanced Dust Particles
+    # 2. Overlay Multi-Layer Dust Particles
     if enable_dust and w_type != "🔱 Spear / Polearm" and render_mode in ["🌟 Full Weapon + FX", "✨ FX & Particles Only"]:
-        dust_layer = render_advanced_dust_particles(
-            canvas_size, weapon_radius, base_rot_angle, swing_arc_range, p_style, p_count, p_color, 
-            p_seed=42, frame_idx=frame_idx, total_frames=total_frames, fade_mult=fade_mult,
-            custom_part_img=custom_part_img, custom_part_scale=custom_part_scale
+        dust_layer = render_multi_particle_engine(
+            canvas_size, weapon_radius, base_rot_angle, swing_arc_range, 
+            particle_layers, frame_idx, total_frames, fade_mult
         )
         frame = Image.alpha_composite(frame, dust_layer)
 
-    # 3. Render Main Weapon (DIABAIKAN JIKA RENDER MODE = "FX & Particles Only")
+    # 3. Render Main Weapon
     if render_mode in ["🌟 Full Weapon + FX", "🗡️ Weapon Only"]:
         if w_type == "🔱 Spear / Polearm":
             thrust_dist = np.sin((frame_idx / float(max(1, total_frames - 1))) * math.pi) * (canvas_size * 0.25)
@@ -439,10 +467,20 @@ if uploaded_file is not None:
     corners = [(0, 0), (src_image.width, 0), (0, src_image.height), (src_image.width, src_image.height)]
     weapon_radius = max(math.hypot(cx - pivot_x_px, cy - pivot_y_px) for cx, cy in corners)
 
+    # ==========================================
+    # 8. MULTI-PARTICLE LAYER SYSTEM
+    # ==========================================
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### ✨ 7. Pro Particle Dust Engine")
+    st.sidebar.markdown("### ✨ 7. Multi-Layer Particle Dust Engine")
     enable_dust = st.sidebar.checkbox("Aktifkan Dust FX", value=True)
     
+    num_particle_layers = st.sidebar.radio(
+        "Berapa Banyak Layer Partikel Kombinasi?",
+        [1, 2, 3],
+        index=0,
+        format_func=lambda x: f"{x} Layer Partikel"
+    )
+
     particle_options = [
         "📁 Custom PNG Particle",
         "✨ Magic Sparkles", "🔥 Fire Embers", "❄️ Ice Crystals", "⚡ Electric Sparks", "🟢 Toxic Slime Bubbles",
@@ -451,21 +489,35 @@ if uploaded_file is not None:
         "👾 Cyber Glitch Pixels", "💀 Shadow Smoke", "🪙 Golden Shimmers", "🕷️ Venom Drips", "💨 Wind Gusts",
         "⚛️ Quantum Plasma", "⚡ Void Lightning", "🌧️ Snow Flakes", "💥 Arcane Orbs", "💖 Heart Particles"
     ]
-    particle_style = st.sidebar.selectbox("Model Dust Partikel:", particle_options)
 
-    if particle_style == "📁 Custom PNG Particle":
-        uploaded_particle_file = st.sidebar.file_uploader("Upload PNG Partikel Custom:", type=["png"])
-        if uploaded_particle_file is not None:
-            custom_part_img = Image.open(uploaded_particle_file).convert("RGBA")
-        else:
-            custom_part_img = None
-        custom_part_scale = st.sidebar.slider("Skala Ukuran Partikel Custom:", 0.1, 2.0, 0.5, 0.05)
-    else:
-        custom_part_img = None
-        custom_part_scale = 1.0
+    particle_layers_config = []
 
-    particle_count = sync_control("particle_count", 25, 5, 80, 1, "Kepadatan Partikel")
-    particle_color = st.sidebar.color_picker("Warna Tint Partikel:", "#00FFFF")
+    for l_idx in range(num_particle_layers):
+        st.sidebar.markdown(f"#### 🎨 Layer Partikel #{l_idx + 1}")
+        
+        p_style = st.sidebar.selectbox(f"Model Partikel L{l_idx + 1}:", particle_options, key=f"p_style_{l_idx}")
+        
+        c_img = None
+        c_scale = 1.0
+        if p_style == "📁 Custom PNG Particle":
+            up_p_file = st.sidebar.file_uploader(f"Upload PNG Partikel Custom L{l_idx + 1}:", type=["png"], key=f"up_p_{l_idx}")
+            if up_p_file is not None:
+                c_img = Image.open(up_p_file).convert("RGBA")
+            c_scale = st.sidebar.slider(f"Skala Partikel Custom L{l_idx + 1}:", 0.1, 2.0, 0.5, 0.05, key=f"p_scale_{l_idx}")
+
+        p_cnt = sync_control(f"p_cnt_{l_idx}", 20 if l_idx == 0 else 15, 5, 80, 1, f"Kepadatan L{l_idx + 1}")
+        
+        default_colors = ["#00FFFF", "#FF4500", "#FFD700"]
+        p_clr = st.sidebar.color_picker(f"Warna Tint L{l_idx + 1}:", default_colors[l_idx % 3], key=f"p_clr_{l_idx}")
+
+        particle_layers_config.append({
+            "enabled": True,
+            "style": p_style,
+            "count": p_cnt,
+            "color": p_clr,
+            "custom_img": c_img,
+            "custom_scale": c_scale
+        })
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🖼️ 8. Sprite Sheet Layout")
@@ -496,7 +548,7 @@ if uploaded_file is not None:
     anim_fps = sync_control("anim_fps", 10, 5, 30, 1, "Frame Rate Preview (FPS)")
 
     # ==========================================
-    # 8. MAIN STUDIO DASHBOARD VIEW
+    # 9. MAIN STUDIO DASHBOARD VIEW
     # ==========================================
     col_v1, col_v2, col_v3 = st.columns([1, 1, 1])
 
@@ -518,14 +570,14 @@ if uploaded_file is not None:
         rotated_base.save(buf_rot, format="PNG")
         st.download_button(f"💾 Download PNG ({base_angle_val}°)", data=buf_rot.getvalue(), file_name=f"Terraria_Item_{base_angle_val}deg.png", mime="image/png", use_container_width=True)
 
-    # RENDER ANIMATION FRAMES (MEMPERHATIKAN RENDER MODE)
+    # RENDER ANIMATION FRAMES (WITH MULTI-LAYER PARTICLES)
     rendered_frames = [
         generate_weapon_frame(
             src_image, weapon_type, idx, sheet_frames_count, 
             base_angle_val, swing_arc_range_val, pivot_x_px, pivot_y_px, frame_canvas_size, 
-            particle_style, particle_count, particle_color, enable_dust,
+            particle_layers_config, enable_dust,
             custom_eff_img, eff_rot_extra, eff_flip_h, eff_flip_v, eff_dist_offset, eff_scale_val, eff_opacity_val,
-            fade_in_pct_val, fade_out_pct_val, custom_part_img, custom_part_scale, weapon_radius,
+            fade_in_pct_val, fade_out_pct_val, weapon_radius,
             render_mode_choice
         )
         for idx in range(sheet_frames_count)
@@ -546,7 +598,7 @@ if uploaded_file is not None:
         )
         gif_bytes = gif_bytes_io.getvalue()
         
-        st.image(gif_bytes, caption=f"Smooth Loop Preview ({render_mode_choice})", use_container_width=True)
+        st.image(gif_bytes, caption=f"Loop Preview ({num_particle_layers} Layers Particle - {render_mode_choice})", use_container_width=True)
         st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name=f"Terraria_Swing_{render_mode_choice}.gif", mime="image/gif", use_container_width=True)
 
     # C# CODE SNIPPET SECTION
@@ -565,7 +617,9 @@ if uploaded_file is not None:
         "⚡ Void Lightning": "DustID.ShadowbeamStaff", "🌧️ Snow Flakes": "DustID.Snow", "💥 Arcane Orbs": "DustID.Nebula",
         "💖 Heart Particles": "DustID.Heart"
     }
-    dust_type_str = dust_id_map.get(particle_style, "DustID.Electric")
+    
+    primary_p_style = particle_layers_config[0]["style"]
+    dust_type_str = dust_id_map.get(primary_p_style, "DustID.Electric")
     
     csharp_code = f"""using Microsoft.Xna.Framework;
 using Terraria;
@@ -591,7 +645,7 @@ namespace YourModName.Items
             Item.rare = ItemRarityID.Green;
         }}
 
-        // Terraria Melee Dust Trail Effect ({particle_style})
+        // Terraria Melee Dust Trail Effect ({primary_p_style})
         public override void MeleeEffects(Player player, Rectangle hitbox)
         {{
             if (Main.rand.NextBool(2))
