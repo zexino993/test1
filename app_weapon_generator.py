@@ -6,10 +6,10 @@ import math
 import random
 import zipfile
 
-st.set_page_config(page_title="Terraria Weapon Master Studio v7.0", layout="wide")
+st.set_page_config(page_title="Terraria Weapon Master Studio v8.0", layout="wide")
 
-st.title("🗡️ Terraria Weapon Master Studio v7.0 (Pro Particle Engine)")
-st.caption("Studio Modder Terraria: Temporal Particle Trailing Engine, Live GIF Previewer, Custom Rotation, & Full Exporter!")
+st.title("🗡️ Terraria Weapon Master Studio v8.0 (Clean Animation Edition)")
+st.caption("Studio Modder Terraria: Clean Swing Preview, Pro Particle Dust Engine, Custom Rotation, Sprite Sheet Layout, & ZIP Package Exporter!")
 
 # ==========================================
 # 1. HELPER & ADVANCED PARTICLE ENGINE
@@ -25,57 +25,7 @@ def generate_glowmask(image, threshold=200):
     img_np[mask, 3] = 0
     return Image.fromarray(img_np)
 
-def render_player_arm(canvas_size):
-    arm = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(arm)
-    center = canvas_size // 2
-    draw.rectangle([center - 6, center + 4, center + 6, center + 18], fill=(198, 134, 100, 160)) # Skin
-    draw.rectangle([center - 7, center + 12, center + 7, center + 22], fill=(80, 100, 180, 160)) # Shirt
-    return arm
-
-def generate_procedural_slash_effect(canvas_size, style_type, current_angle, arc_span, arc_radius_ratio, glow_color, intensity):
-    layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(layer)
-    center = canvas_size // 2
-    
-    radius = int(canvas_size * arc_radius_ratio)
-    bbox = [center - radius, center - radius, center + radius, center + radius]
-    
-    start_deg = -current_angle - (arc_span / 2.0)
-    end_deg = -current_angle + (arc_span / 2.0)
-    
-    c_hex = glow_color.lstrip('#')
-    r_c, g_c, b_c = int(c_hex[0:2], 16), int(c_hex[2:4], 16), int(c_hex[4:6], 16)
-    
-    if style_type == "✨ Smooth Energy Arc":
-        for i in range(3):
-            w = int((6 + i * 4) * intensity)
-            alpha = int((140 - i * 35) * min(1.0, intensity))
-            draw.arc(bbox, start=start_deg, end=end_deg, fill=(r_c, g_c, b_c, alpha), width=max(1, w))
-        draw.arc(bbox, start=start_deg, end=end_deg, fill=(255, 255, 255, int(220 * min(1.0, intensity))), width=max(2, int(3 * intensity)))
-        glow = layer.filter(ImageFilter.GaussianBlur(radius=3))
-        return Image.alpha_composite(glow, layer)
-
-    elif style_type == "🔥 Flame Wave":
-        for i in range(5):
-            r_offset = radius + (i * 3)
-            bb = [center - r_offset, center - r_offset, center + r_offset, center + r_offset]
-            alpha = int((180 - i * 30) * min(1.0, intensity))
-            draw.arc(bb, start=start_deg, end=end_deg, fill=(min(255, r_c + i*20), max(0, g_c - i*30), b_c, alpha), width=int(4 * intensity))
-        glow = layer.filter(ImageFilter.GaussianBlur(radius=2))
-        return Image.alpha_composite(glow, layer)
-
-    elif style_type == "❄️ Ice Crescent":
-        draw.arc(bbox, start=start_deg, end=end_deg, fill=(r_c, g_c, b_c, int(200 * min(1.0, intensity))), width=int(10 * intensity))
-        draw.arc(bbox, start=start_deg + 10, end=end_deg - 10, fill=(255, 255, 255, 255), width=int(4 * intensity))
-        return layer
-
-    else:
-        draw.arc(bbox, start=start_deg, end=end_deg, fill=(r_c, g_c, b_c, int(255 * min(1.0, intensity))), width=int(3 * intensity))
-        draw.arc(bbox, start=start_deg, end=end_deg, fill=(255, 255, 255, 255), width=1)
-        return layer
-
-def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range, p_style, p_count, p_color, p_seed, frame_idx, total_frames, arc_radius_ratio):
+def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range, p_style, p_count, p_color, p_seed, frame_idx, total_frames):
     """Sistem Partikel Lanjutan dengan Jejak Waktu (Temporal Trailing & Fade)."""
     layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
@@ -84,7 +34,7 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
     c_hex = p_color.lstrip('#')
     r_c, g_c, b_c = int(c_hex[0:2], 16), int(c_hex[2:4], 16), int(c_hex[4:6], 16)
     
-    base_radius = canvas_size * arc_radius_ratio
+    base_radius = canvas_size * 0.42
     swing_progress = frame_idx / float(max(1, total_frames - 1))
     half_range = swing_arc_range / 2.0
 
@@ -108,7 +58,7 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
             
             drift_x = random.uniform(-4, 4) * age * 10
             
-            # 1. 🔥 FIRE EMBERS (Melayang ke atas & berubah warna)
+            # 1. 🔥 FIRE EMBERS
             if p_style == "🔥 Fire Embers":
                 drift_y = -random.uniform(5, 12) * age * 12
                 p_r = max(1, int((1.0 - age * 0.7) * random.uniform(2, 5)))
@@ -118,7 +68,7 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
                     fill=(255, int(max(0, 200 - age * 200)), 0, alpha)
                 )
 
-            # 2. ✨ MAGIC SPARKLES (Bintang 4 sudut khas Terraria)
+            # 2. ✨ MAGIC SPARKLES
             elif p_style == "✨ Magic Sparkles":
                 drift_y = random.uniform(-3, 3) * age * 8
                 p_r = max(1, int((1.0 - age * 0.5) * random.uniform(2, 4)))
@@ -128,7 +78,7 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
                 draw.line([(px, py - p_r * 2), (px, py + p_r * 2)], fill=(r_c, g_c, b_c, alpha), width=1)
                 draw.rectangle([px - 1, py - 1, px + 1, py + 1], fill=(255, 255, 255, alpha))
 
-            # 3. ⚡ ELECTRIC SPARKS (Garis menyambar)
+            # 3. ⚡ ELECTRIC SPARKS
             elif p_style == "⚡ Electric Sparks":
                 drift_y = random.uniform(-6, 6) * age * 8
                 alpha = int(max(0, (1.0 - age * 1.2) * 255))
@@ -137,7 +87,7 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
                 dx2, dy2 = dx1 + random.randint(-4, 4), dy1 + random.randint(-4, 4)
                 draw.line([(px, py), (px + dx1, py + dy1), (px + dx2, py + dy2)], fill=(r_c, g_c, 255, alpha), width=1)
 
-            # 4. ❄️ ICE CRYSTALS (Kristal belah ketupat jatuh)
+            # 4. ❄️ ICE CRYSTALS
             elif p_style == "❄️ Ice Crystals":
                 drift_y = random.uniform(2, 8) * age * 8
                 p_r = max(1, int((1.0 - age * 0.4) * random.uniform(2, 4)))
@@ -145,7 +95,7 @@ def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range,
                 px, py = spawn_x + drift_x, spawn_y + drift_y
                 draw.polygon([(px, py - p_r), (px + p_r, py), (px, py + p_r), (px - p_r, py)], fill=(200, 240, 255, alpha))
 
-            # 5. 🟢 TOXIC SLIME BUBBLES (Gelembung menetes)
+            # 5. 🟢 TOXIC SLIME BUBBLES
             else:
                 drift_y = random.uniform(3, 10) * age * 10
                 p_r = max(1, int((1.0 - age * 0.3) * random.uniform(2, 5)))
@@ -187,14 +137,10 @@ def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v
     return layer
 
 def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_angle, swing_arc_range, pivot_x, pivot_y, canvas_size, 
-                            slash_style, glow_color, arc_intensity, arc_span, arc_rad_ratio, 
                             p_style, p_count, p_color, enable_dust,
-                            custom_effect_img, eff_extra_rot, eff_flip_h, eff_flip_v, eff_offset, eff_scale, eff_opacity, show_arm):
+                            custom_effect_img, eff_extra_rot, eff_flip_h, eff_flip_v, eff_offset, eff_scale, eff_opacity):
     frame = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     canvas_center = canvas_size // 2
-
-    if show_arm:
-        frame = Image.alpha_composite(frame, render_player_arm(canvas_size))
 
     half_range = swing_arc_range / 2.0
     if w_type == "⚔️ Broadsword / Sword":
@@ -206,7 +152,7 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
     else: # Spear
         angle = base_rot_angle
 
-    # 1. Overlay Custom PNG Effect
+    # 1. Overlay Custom PNG Effect (Jika Diunggah)
     if custom_effect_img is not None:
         eff_layer = overlay_custom_effect_image(
             custom_effect_img, angle, eff_extra_rot, eff_flip_h, eff_flip_v, 
@@ -214,21 +160,15 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
         )
         frame = Image.alpha_composite(frame, eff_layer)
 
-    # 2. Overlay Procedural Slash Effect
-    if arc_intensity > 0 and w_type != "🔱 Spear / Polearm":
-        span = 360 if "Scythe" in w_type else arc_span
-        proc_arc = generate_procedural_slash_effect(canvas_size, slash_style, angle, span, arc_rad_ratio, glow_color, arc_intensity)
-        frame = Image.alpha_composite(frame, proc_arc)
-
-    # 3. Overlay Advanced Dust Particles (Temporal Engine)
+    # 2. Overlay Advanced Dust Particles
     if enable_dust and w_type != "🔱 Spear / Polearm":
         dust_layer = render_advanced_dust_particles(
             canvas_size, base_rot_angle, swing_arc_range, p_style, p_count, p_color, 
-            p_seed=42, frame_idx=frame_idx, total_frames=total_frames, arc_radius_ratio=arc_rad_ratio
+            p_seed=42, frame_idx=frame_idx, total_frames=total_frames
         )
         frame = Image.alpha_composite(frame, dust_layer)
 
-    # 4. Render Main Weapon
+    # 3. Render Main Weapon
     if w_type == "🔱 Spear / Polearm":
         thrust_dist = np.sin((frame_idx / float(max(1, total_frames - 1))) * math.pi) * (canvas_size * 0.25)
         rotated = rotate_nearest_neighbor(weapon_img, base_rot_angle)
@@ -346,36 +286,27 @@ if uploaded_file is not None:
     pivot_y_pct = st.sidebar.slider("Grip Posisi Y (%):", 0, 100, def_y)
     pivot_x_px = int((pivot_x_pct / 100.0) * src_image.width)
     pivot_y_px = int((pivot_y_pct / 100.0) * src_image.height)
-    show_dummy_arm = st.sidebar.checkbox("Tampilkan Dummy Arm Karakter", value=True)
 
     st.sidebar.markdown("---")
-    st.sidebar.header("🎨 5. Procedural Slash FX Generator")
-    slash_fx_style = st.sidebar.selectbox("Model Efek Tebasan Python:", ["✨ Smooth Energy Arc", "🔥 Flame Wave", "❄️ Ice Crescent", "⚡ Laser Blade Sharp"])
-    arc_color = st.sidebar.color_picker("Warna Efek Arc:", "#00FFFF")
-    arc_power = st.sidebar.slider("Intensitas Efek Arc:", 0.0, 2.5, 1.2, 0.1)
-    arc_span_deg = st.sidebar.slider("Sudut Panjang Busur Arc (°):", 30, 180, 90, 5)
-    arc_radius_val = st.sidebar.slider("Jangkauan Radius (% Canvas):", 20, 50, 42, 1) / 100.0
-
-    st.sidebar.markdown("---")
-    st.sidebar.header("✨ 6. Pro Particle & Dust Trail Engine")
+    st.sidebar.header("✨ 5. Pro Particle & Dust Trail Engine")
     enable_dust = st.sidebar.checkbox("Aktifkan Dust Trail FX", value=True)
     particle_style = st.sidebar.selectbox("Model Dust Partikel:", ["✨ Magic Sparkles", "🔥 Fire Embers", "❄️ Ice Crystals", "⚡ Electric Sparks", "🟢 Toxic Slime Bubbles"])
     particle_count = st.sidebar.slider("Kepadatan Dust Partikel:", 5, 50, 25)
     particle_color = st.sidebar.color_picker("Warna Dust Partikel:", "#00FFFF")
 
     st.sidebar.markdown("---")
-    st.sidebar.header("🖼️ 7. Pengaturan Layout Sprite Sheet")
+    st.sidebar.header("🖼️ 6. Pengaturan Layout Sprite Sheet")
     sheet_orientation = st.sidebar.selectbox("Arah Susunan (Orientasi Layout):", ["Horizontal Grid (Kiri ke Kanan)", "Vertical Grid (Atas ke Bawah)", "Horizontal Strip (1 Baris Horizontal)", "Vertical Strip (1 Kolom Vertikal)"])
     grid_limit = st.sidebar.slider("Jumlah Kolom/Baris Utama Grid:", 2, 8, 4) if "Grid" in sheet_orientation else 1
     padding_between_frames = st.sidebar.slider("Jarak Antar Frame (Padding Px):", 0, 16, 0)
 
     st.sidebar.markdown("---")
-    st.sidebar.header("🪄 8. Glowmask Generator")
+    st.sidebar.header("🪄 7. Glowmask Generator")
     enable_glowmask = st.sidebar.checkbox("Generate Glowmask", value=False)
     glow_threshold = st.sidebar.slider("Glow Threshold:", 50, 255, 180)
 
     st.sidebar.markdown("---")
-    st.sidebar.header("🎬 9. Frame Export Settings")
+    st.sidebar.header("🎬 8. Frame Export Settings")
     sheet_frames_count = st.sidebar.slider("Jumlah Frame Animasi:", 3, 12, 6)
     frame_canvas_size = st.sidebar.select_slider("Canvas Size per Frame (Px):", options=[64, 80, 96, 128], value=80)
     anim_fps = st.select_slider("Kecepatan Preview Animasi (FPS):", options=[5, 8, 10, 12, 15, 20], value=10)
@@ -403,15 +334,13 @@ if uploaded_file is not None:
         rotated_base.save(buf_rot, format="PNG")
         st.download_button(f"💾 Download PNG Senjata ({base_angle_val}°)", data=buf_rot.getvalue(), file_name=f"Terraria_Item_{base_angle_val}deg.png", mime="image/png", use_container_width=True)
 
-    # RENDER ANIMATION FRAMES
+    # RENDER ANIMATION FRAMES (CLEAN RENDERING)
     rendered_frames = [
         generate_weapon_frame(
             src_image, weapon_type, idx, sheet_frames_count, 
             base_angle_val, swing_arc_range_val, pivot_x_px, pivot_y_px, frame_canvas_size, 
-            slash_fx_style, arc_color, arc_power, 
-            arc_span_deg, arc_radius_val, 
             particle_style, particle_count, particle_color, enable_dust,
-            custom_eff_img, eff_rot_extra, eff_flip_h, eff_flip_v, eff_dist_offset, eff_scale_val, eff_opacity_val, show_dummy_arm
+            custom_eff_img, eff_rot_extra, eff_flip_h, eff_flip_v, eff_dist_offset, eff_scale_val, eff_opacity_val
         )
         for idx in range(sheet_frames_count)
     ]
@@ -436,7 +365,7 @@ if uploaded_file is not None:
         )
         gif_bytes = gif_bytes_io.getvalue()
         
-        st.image(gif_bytes, caption=f"Live Loop Preview ({anim_fps} FPS)", use_container_width=True)
+        st.image(gif_bytes, caption=f"Clean Live Loop Preview ({anim_fps} FPS)", use_container_width=True)
         st.download_button("💾 Download Animated GIF Preview (.gif)", data=gif_bytes, file_name="Terraria_Weapon_Swing_Animation.gif", mime="image/gif", use_container_width=True)
 
     with col_anim2:
