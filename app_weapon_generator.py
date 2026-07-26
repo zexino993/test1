@@ -8,7 +8,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Terraria Weapon Master Studio v14.4",
+    page_title="Terraria Weapon Master Studio v15.0",
     page_icon="🗡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -73,8 +73,8 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v14.4</div>
-    <div class="studio-subtitle">Studio Modding Terraria Pro: GD Physics Particle Engine, Trajectory Modes, & Exact Parameter Mismatch Fix.</div>
+    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v15.0</div>
+    <div class="studio-subtitle">Simple Particle Edition: Mode Trajectory (Arc & Projectile), Simple 4-Param Particle Layers, & Mod Exporter.</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -130,7 +130,7 @@ def generate_glowmask(image, threshold=200):
     img_np[mask, 3] = 0
     return Image.fromarray(img_np)
 
-def render_gd_particle_layer(draw, layer_canvas, canvas_size, weapon_radius, base_rot_angle, swing_arc_range, p_cfg, p_seed, frame_idx, total_frames, fade_mult, trajectory_mode, linear_travel_dist):
+def render_simple_particle_layer(draw, layer_canvas, canvas_size, weapon_radius, base_rot_angle, swing_arc_range, p_cfg, p_seed, frame_idx, total_frames, fade_mult, trajectory_mode, linear_travel_dist):
     center = canvas_size // 2
     c_hex = p_cfg["color"].lstrip('#')
     r_c, g_c, b_c = int(c_hex[0:2], 16), int(c_hex[2:4], 16), int(c_hex[4:6], 16)
@@ -138,23 +138,13 @@ def render_gd_particle_layer(draw, layer_canvas, canvas_size, weapon_radius, bas
     swing_progress = frame_idx / float(max(1, total_frames - 1))
     random.seed(p_seed)
     
-    max_particles = p_cfg["max_particles"]
-    lifetime = p_cfg["lifetime"]
-    speed = p_cfg["speed"]
-    angle_deg = p_cfg["angle"]
-    angle_var = p_cfg["angle_var"]
-    pos_var_x = p_cfg["pos_var_x"]
-    pos_var_y = p_cfg["pos_var_y"]
-    grav_x = p_cfg["gravity_x"]
-    grav_y = p_cfg["gravity_y"]
-    accel_rad = p_cfg["accel_rad"]
-    accel_tan = p_cfg["accel_tan"]
-
-    for i in range(max_particles):
+    p_count = p_cfg["count"]
+    
+    for i in range(p_count):
         birth_progress = random.uniform(0.0, 0.8)
         if swing_progress >= birth_progress:
-            age_norm = (swing_progress - birth_progress) / max(0.1, lifetime)
-            if age_norm > 1.0:
+            age = (swing_progress - birth_progress)
+            if age > 1.0:
                 continue
 
             if trajectory_mode == "🌀 Arc Swing (Rotasi Berputar)":
@@ -170,40 +160,19 @@ def render_gd_particle_layer(draw, layer_canvas, canvas_size, weapon_radius, bas
                 emit_x = center + travel_progress * math.cos(rad_lin)
                 emit_y = center + travel_progress * math.sin(rad_lin)
 
-            px = emit_x + random.uniform(-pos_var_x, pos_var_x)
-            py = emit_y + random.uniform(-pos_var_y, pos_var_y)
+            px = emit_x + random.uniform(-10, 10)
+            py = emit_y + random.uniform(-10, 10)
 
-            particle_angle = math.radians(angle_deg + random.uniform(-angle_var, angle_var))
-            current_speed = speed * (1.0 + age_norm)
-            
-            dx = current_speed * math.cos(particle_angle) * (swing_progress - birth_progress) * 5
-            dy = current_speed * math.sin(particle_angle) * (swing_progress - birth_progress) * 5
-            
-            dx += 0.5 * grav_x * (swing_progress - birth_progress)**2 * 50
-            dy += 0.5 * grav_y * (swing_progress - birth_progress)**2 * 50
-
-            if accel_rad != 0 or accel_tan != 0:
-                vec_x = px - emit_x
-                vec_y = py - emit_y
-                dist = math.hypot(vec_x, vec_y) + 0.001
-                nx, ny = vec_x / dist, vec_y / dist
-                tx, ty = -ny, nx
-                dx += (nx * accel_rad + tx * accel_tan) * (swing_progress - birth_progress) * 20
-                dy += (ny * accel_rad + ty * accel_tan) * (swing_progress - birth_progress) * 20
-
-            final_x = px + dx
-            final_y = py + dy
-
-            base_alpha = max(0, (1.0 - age_norm) * 255)
+            base_alpha = max(0, (1.0 - age) * 255)
             alpha = int(base_alpha * fade_mult)
-            p_r = max(1, int((1.0 - age_norm * 0.5) * random.uniform(2, 5)))
+            p_r = max(1, int((1.0 - age * 0.5) * random.uniform(2, 5)))
 
             p_style = p_cfg["style"]
             custom_part_img = p_cfg.get("custom_img", None)
             custom_part_scale = p_cfg.get("custom_scale", 1.0)
 
             if p_style == "📁 Custom PNG Particle" and custom_part_img is not None:
-                scale_factor = (1.0 - age_norm * 0.3) * custom_part_scale
+                scale_factor = (1.0 - age * 0.3) * custom_part_scale
                 w_p = max(1, int(custom_part_img.width * scale_factor))
                 h_p = max(1, int(custom_part_img.height * scale_factor))
                 resized_p = custom_part_img.resize((w_p, h_p), resample=Image.NEAREST)
@@ -212,60 +181,32 @@ def render_gd_particle_layer(draw, layer_canvas, canvas_size, weapon_radius, bas
                 resized_p = Image.fromarray(p_np)
                 rot_deg = random.randint(0, 360)
                 rotated_p = rotate_nearest_neighbor(resized_p, rot_deg)
-                layer_canvas.paste(rotated_p, (int(final_x - rotated_p.width // 2), int(final_y - rotated_p.height // 2)), rotated_p)
-            elif p_style == "🔥 Fire Embers (Api Unggul)":
-                draw.ellipse([final_x - p_r, final_y - p_r, final_x + p_r, final_y + p_r], fill=(255, int(max(0, 220 - age_norm * 200)), 20, alpha))
-            elif p_style == "✨ Magic Sparkles":
-                draw.line([(final_x - p_r * 2, final_y), (final_x + p_r * 2, final_y)], fill=(r_c, g_c, b_c, alpha), width=1)
-                draw.line([(final_x, final_y - p_r * 2), (final_x, final_y + p_r * 2)], fill=(r_c, g_c, b_c, alpha), width=1)
-                draw.rectangle([final_x - 1, final_y - 1, final_x + 1, final_y + 1], fill=(255, 255, 255, alpha))
-            elif p_style == "❄️ Ice Crystals":
-                draw.polygon([(final_x, final_y - p_r), (final_x + p_r, final_y), (final_x, final_y + p_r), (final_x - p_r, final_y)], fill=(200, 240, 255, alpha))
-            elif p_style == "⚡ Electric Sparks":
+                layer_canvas.paste(rotated_p, (int(px - rotated_p.width // 2), int(py - rotated_p.height // 2)), rotated_p)
+            elif p_style == "🔥 Fire Embers (Api)":
+                draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], fill=(255, int(max(0, 200 - age * 200)), 0, alpha))
+            elif p_style == "✨ Magic Sparkles (Bintang)":
+                draw.line([(px - p_r * 2, py), (px + p_r * 2, py)], fill=(r_c, g_c, b_c, alpha), width=1)
+                draw.line([(px, py - p_r * 2), (px, py + p_r * 2)], fill=(r_c, g_c, b_c, alpha), width=1)
+                draw.rectangle([px - 1, py - 1, px + 1, py + 1], fill=(255, 255, 255, alpha))
+            elif p_style == "❄️ Ice Crystals (Es)":
+                draw.polygon([(px, py - p_r), (px + p_r, py), (px, py + p_r), (px - p_r, py)], fill=(200, 240, 255, alpha))
+            elif p_style == "⚡ Electric Sparks (Listrik)":
                 dx1, dy1 = random.randint(-4, 4), random.randint(-4, 4)
-                draw.line([(final_x, final_y), (final_x + dx1, final_y + dy1)], fill=(r_c, g_c, 255, alpha), width=1)
-            elif p_style == "🟢 Toxic Slime Bubbles":
-                draw.ellipse([final_x - p_r, final_y - p_r, final_x + p_r, final_y + p_r], outline=(50, 255, 100, alpha), width=1)
-            elif p_style == "🌸 Cherry Blossoms":
-                draw.ellipse([final_x - p_r, final_y - p_r, final_x + p_r, final_y + p_r], fill=(255, 182, 193, alpha))
-            elif p_style == "🌌 Cosmic Nebulae":
-                draw.ellipse([final_x - p_r*2, final_y - p_r*2, final_x + p_r*2, final_y + p_r*2], fill=(138, 43, 226, int(alpha*0.5)))
-            elif p_style == "🌋 Lava Sparks":
-                draw.rectangle([final_x - 1, final_y - 1, final_x + 1, final_y + 1], fill=(255, 68, 0, alpha))
-            elif p_style == "💥 Explosion Cinders":
-                draw.polygon([(final_x, final_y - p_r), (final_x + p_r, final_y), (final_x, final_y + p_r)], fill=(255, 140, 0, alpha))
-            elif p_style == "☀️ Solar Flares":
-                draw.ellipse([final_x - p_r*1.5, final_y - p_r*1.5, final_x + p_r*1.5, final_y + p_r*1.5], fill=(255, 215, 0, alpha))
-            elif p_style == "🍃 Forest Leaves":
-                draw.polygon([(final_x - p_r, final_y), (final_x, final_y - p_r*2), (final_x + p_r, final_y), (final_x, final_y + p_r)], fill=(34, 139, 34, alpha))
-            elif p_style == "💧 Water Drops":
-                draw.ellipse([final_x - 1, final_y - p_r*1.5, final_x + 1, final_y + p_r*1.5], fill=(30, 144, 255, alpha))
-            elif p_style == "🌟 Starlight Rays":
-                draw.line([(final_x - p_r*3, final_y), (final_x + p_r*3, final_y)], fill=(255, 255, 255, alpha), width=1)
-            elif p_style == "🔮 Rune Symbols":
-                draw.rectangle([final_x - p_r, final_y - p_r, final_x + p_r, final_y + p_r], outline=(147, 112, 219, alpha), width=1)
-            elif p_style == "🩸 Blood Spatters":
-                draw.ellipse([final_x - p_r, final_y - p_r, final_x + p_r, final_y + p_r], fill=(178, 34, 34, alpha))
-            elif p_style == "👾 Cyber Glitch Pixels":
-                draw.rectangle([final_x - 2, final_y - 1, final_x + 2, final_y + 1], fill=(0, 255, 255, alpha))
-            elif p_style == "💀 Shadow Smoke":
-                draw.ellipse([final_x - p_r*2, final_y - p_r*2, final_x + p_r*2, final_y + p_r*2], fill=(40, 40, 50, int(alpha*0.4)))
-            elif p_style == "🪙 Golden Shimmers":
-                draw.polygon([(final_x, final_y - p_r), (final_x + p_r, final_y), (final_x, final_y + p_r), (final_x - p_r, final_y)], fill=(255, 223, 0, alpha))
-            elif p_style == "🕷️ Venom Drips":
-                draw.line([(final_x, final_y), (final_x, final_y + p_r*2)], fill=(128, 0, 128, alpha), width=2)
-            elif p_style == "💨 Wind Gusts":
-                draw.arc([final_x - 5, final_y - 5, final_x + 5, final_y + 5], start=0, end=180, fill=(240, 248, 255, alpha), width=1)
-            elif p_style == "⚛️ Quantum Plasma":
-                draw.ellipse([final_x - p_r, final_y - p_r, final_x + p_r, final_y + p_r], fill=(0, 255, 200, alpha))
-            elif p_style == "⚡ Void Lightning":
-                draw.line([(final_x, final_y), (final_x + 3, final_y + 3), (final_x - 2, final_y + 6)], fill=(138, 43, 226, alpha), width=1)
-            elif p_style == "🌧️ Snow Flakes":
-                draw.rectangle([final_x - p_r, final_y - p_r, final_x + p_r, final_y + p_r], fill=(255, 255, 255, alpha))
-            elif p_style == "💥 Arcane Orbs":
-                draw.ellipse([final_x - p_r, final_y - p_r, final_x + p_r, final_y + p_r], fill=(218, 112, 214, alpha))
+                draw.line([(px, py), (px + dx1, py + dy1)], fill=(r_c, g_c, 255, alpha), width=1)
+            elif p_style == "🟢 Toxic Slime (Racun)":
+                draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], outline=(50, 255, 100, alpha), width=1)
+            elif p_style == "🌸 Cherry Blossoms (Kelopak)":
+                draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], fill=(255, 182, 193, alpha))
+            elif p_style == "🌌 Cosmic Nebulae (Kosmik)":
+                draw.ellipse([px - p_r*2, py - p_r*2, px + p_r*2, py + p_r*2], fill=(138, 43, 226, int(alpha*0.5)))
+            elif p_style == "🩸 Blood Spatters (Darah)":
+                draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], fill=(178, 34, 34, alpha))
+            elif p_style == "🪙 Golden Shimmers (Emas)":
+                draw.polygon([(px, py - p_r), (px + p_r, py), (px, py + p_r), (px - p_r, py)], fill=(255, 223, 0, alpha))
+            elif p_style == "💨 Wind Gusts (Angin)":
+                draw.arc([px - 5, py - 5, px + 5, py + 5], start=0, end=180, fill=(240, 248, 255, alpha), width=1)
             else: 
-                draw.polygon([(final_x - 2, final_y), (final_x, final_y - 2), (final_x + 2, final_y), (final_x, final_y + 3)], fill=(255, 105, 180, alpha))
+                draw.polygon([(px - 2, py), (px, py - 2), (px + 2, py), (px, py + 3)], fill=(255, 105, 180, alpha))
 
 def render_multi_particle_engine(canvas_size, weapon_radius, base_rot_angle, swing_arc_range, particle_layers, frame_idx, total_frames, fade_mult, trajectory_mode, linear_travel_dist):
     master_layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
@@ -274,7 +215,7 @@ def render_multi_particle_engine(canvas_size, weapon_radius, base_rot_angle, swi
             continue
         layer_canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(layer_canvas)
-        render_gd_particle_layer(
+        render_simple_particle_layer(
             draw=draw, layer_canvas=layer_canvas, canvas_size=canvas_size,
             weapon_radius=weapon_radius, base_rot_angle=base_rot_angle, swing_arc_range=swing_arc_range,
             p_cfg=p_cfg, p_seed=42 + idx * 99, frame_idx=frame_idx, total_frames=total_frames, fade_mult=fade_mult,
@@ -422,7 +363,7 @@ def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padd
     return sheet, cols, rows
 
 # ==========================================
-# 7. GLOBAL SAFE DEFAULTS FOR CUSTOM EFFECT (EXACT MATCH)
+# 7. GLOBAL SAFE DEFAULTS FOR CUSTOM EFFECT
 # ==========================================
 custom_effect_img = None
 eff_extra_rot = 0
@@ -503,11 +444,11 @@ if uploaded_file is not None:
     weapon_radius = max(math.hypot(cx - pivot_x_px, cy - pivot_y_px) for cx, cy in corners)
 
     # ==========================================
-    # 9. GEOMETRY DASH STYLE ADVANCED PARTICLE EDITOR
+    # 9. SIMPLE PARTICLE ENGINE (UP TO 3 LAYERS)
     # ==========================================
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🔥 7. GD Style Advanced Particle Editor")
-    enable_dust = st.sidebar.checkbox("Aktifkan Dust & Particle FX", value=True)
+    st.sidebar.markdown("### ✨ 7. Simple Particle Engine")
+    enable_dust = st.sidebar.checkbox("Aktifkan Partikel / Dust FX", value=True)
     
     num_particle_layers = st.sidebar.radio(
         "Berapa Banyak Layer Partikel?",
@@ -518,55 +459,32 @@ if uploaded_file is not None:
 
     particle_options = [
         "📁 Custom PNG Particle",
-        "🔥 Fire Embers (Api Unggul)", "✨ Magic Sparkles", "❄️ Ice Crystals", "⚡ Electric Sparks", "🟢 Toxic Slime Bubbles",
-        "🌸 Cherry Blossoms", "🌌 Cosmic Nebulae", "🌋 Lava Sparks", "💥 Explosion Cinders", "☀️ Solar Flares",
-        "🍃 Forest Leaves", "💧 Water Drops", "🌟 Starlight Rays", "🔮 Rune Symbols", "🩸 Blood Spatters",
-        "👾 Cyber Glitch Pixels", "💀 Shadow Smoke", "🪙 Golden Shimmers", "🕷️ Venom Drips", "💨 Wind Gusts",
-        "⚛️ Quantum Plasma", "⚡ Void Lightning", "🌧️ Snow Flakes", "💥 Arcane Orbs", "💖 Heart Particles"
+        "🔥 Fire Embers (Api)", "✨ Magic Sparkles (Bintang)", "❄️ Ice Crystals (Es)", "⚡ Electric Sparks (Listrik)",
+        "🟢 Toxic Slime (Racun)", "🌸 Cherry Blossoms (Kelopak)", "🌌 Cosmic Nebulae (Kosmik)", "🩸 Blood Spatters (Darah)",
+        "🪙 Golden Shimmers (Emas)", "💨 Wind Gusts (Angin)"
     ]
 
     particle_layers_config = []
     for l_idx in range(num_particle_layers):
-        st.sidebar.markdown(f"#### 🎛️ GD Particle Config #{l_idx + 1}")
+        st.sidebar.markdown(f"#### 🎨 Partikel Layer #{l_idx + 1}")
         p_style = st.sidebar.selectbox(f"Model Partikel L{l_idx + 1}:", particle_options, key=f"p_style_{l_idx}")
         
         c_img = None
         c_scale = 1.0
         if p_style == "📁 Custom PNG Particle":
-            up_p_file = st.sidebar.file_uploader(f"Upload Custom PNG L{l_idx + 1}:", type=["png"], key=f"up_p_{l_idx}")
+            up_p_file = st.sidebar.file_uploader(f"Upload PNG Partikel L{l_idx + 1}:", type=["png"], key=f"up_p_{l_idx}")
             if up_p_file is not None:
                 c_img = Image.open(up_p_file).convert("RGBA")
             c_scale = st.sidebar.slider(f"Skala PNG L{l_idx + 1}:", 0.1, 2.0, 0.5, 0.05, key=f"p_scale_{l_idx}")
 
-        max_p = sync_control(f"max_p_{l_idx}", 30, 5, 100, 1, f"Max Particles L{l_idx + 1}")
-        lifetime = sync_control(f"lifetime_{l_idx}", 100, 10, 500, 10, f"Lifetime L{l_idx + 1}") / 100.0
-        speed = sync_control(f"speed_{l_idx}", 30, 0, 150, 5, f"Speed L{l_idx + 1}")
-        angle = sync_control(f"angle_{l_idx}", -90, -180, 180, 5, f"Angle L{l_idx + 1}")
-        angle_var = sync_control(f"angle_var_{l_idx}", 90, 0, 180, 5, f"Angle Var (±) L{l_idx + 1}")
-        pos_var_x = sync_control(f"pos_var_x_{l_idx}", 10, 0, 50, 1, f"PosVar X L{l_idx + 1}")
-        pos_var_y = sync_control(f"pos_var_y_{l_idx}", 10, 0, 50, 1, f"PosVar Y L{l_idx + 1}")
-        gravity_x = sync_control(f"grav_x_{l_idx}", 0, -50, 50, 1, f"Gravity X L{l_idx + 1}")
-        gravity_y = sync_control(f"grav_y_{l_idx}", 0, -50, 50, 1, f"Gravity Y L{l_idx + 1}")
-        accel_rad = sync_control(f"accel_rad_{l_idx}", 0, -50, 50, 1, f"AccelRad L{l_idx + 1}")
-        accel_tan = sync_control(f"accel_tan_{l_idx}", 0, -50, 50, 1, f"AccelTan L{l_idx + 1}")
-        
+        p_count = sync_control(f"p_cnt_{l_idx}", 20 if l_idx == 0 else 15, 5, 60, 1, f"Jumlah Partikel L{l_idx + 1}")
         default_colors = ["#FF4500", "#00FFFF", "#FFD700"]
         p_clr = st.sidebar.color_picker(f"Warna Tint L{l_idx + 1}:", default_colors[l_idx % 3], key=f"p_clr_{l_idx}")
 
         particle_layers_config.append({
             "enabled": True,
             "style": p_style,
-            "max_particles": max_p,
-            "lifetime": lifetime,
-            "speed": speed,
-            "angle": angle,
-            "angle_var": angle_var,
-            "pos_var_x": pos_var_x,
-            "pos_var_y": pos_var_y,
-            "gravity_x": gravity_x,
-            "gravity_y": gravity_y,
-            "accel_rad": accel_rad,
-            "accel_tan": accel_tan,
+            "count": p_count,
             "color": p_clr,
             "custom_img": c_img,
             "custom_scale": c_scale
@@ -585,176 +503,4 @@ if uploaded_file is not None:
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🪄 9. Glowmask Generator")
     enable_glowmask = st.sidebar.checkbox("Generate Glowmask", value=False)
-    glow_threshold = sync_control("glow_thresh", 180, 50, 255, 5, "Threshold Glow")
-
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🎬 10. Export & Preview Settings")
-    
-    safe_canvas_size = max(128, int((weapon_radius * 2) + linear_travel_dist + 60))
-    safe_canvas_size = min(1024, safe_canvas_size)
-    
-    sheet_frames_count = sync_control("sheet_frames", 6, 3, 16, 1, "Jumlah Frame Animasi")
-    st.sidebar.caption(f"*(Saran Anti-Crop: Auto-Canvas = {safe_canvas_size}px)*")
-    frame_canvas_size = sync_control("frame_canvas_size", safe_canvas_size, 64, 1024, 8, "Resolusi Canvas (Px)")
-    anim_fps = sync_control("anim_fps", 10, 5, 30, 1, "Frame Rate Preview (FPS)")
-
-    # ==========================================
-    # 10. MAIN STUDIO DASHBOARD VIEW
-    # ==========================================
-    col_v1, col_v2, col_v3 = st.columns([1, 1, 1])
-
-    with col_v1:
-        st.markdown("##### 🎯 1. Pivot Crosshair Inspector")
-        pivot_inspect_img = src_image.copy()
-        draw_insp = ImageDraw.Draw(pivot_inspect_img)
-        cs = 4
-        draw_insp.line([(pivot_x_px - cs, pivot_y_px), (pivot_x_px + cs, pivot_y_px)], fill=(255, 0, 0, 255), width=2)
-        draw_insp.line([(pivot_x_px, pivot_y_px - cs), (pivot_x_px, pivot_y_px + cs)], fill=(255, 0, 0, 255), width=2)
-        st.image(pivot_inspect_img, caption=f"Original ({src_image.width}x{src_image.height} px)", use_container_width=True)
-
-    with col_v2:
-        st.subheader(f"⚔️ 2. Rotasi ({base_angle_val}°)")
-        rotated_base = rotate_nearest_neighbor(src_image, base_angle_val)
-        st.image(rotated_base, caption=f"Ready Sprite ({rotated_base.width}x{rotated_base.height} px)", use_container_width=True)
-        
-        buf_rot = io.BytesIO()
-        rotated_base.save(buf_rot, format="PNG")
-        st.download_button(f"💾 Download PNG ({base_angle_val}°)", data=buf_rot.getvalue(), file_name=f"Terraria_Item_{base_angle_val}deg.png", mime="image/png", use_container_width=True)
-
-    # RENDER ANIMATION FRAMES
-    rendered_frames = [
-        generate_weapon_frame(
-            src_image, weapon_type, idx, sheet_frames_count, 
-            base_angle_val, swing_arc_range_val, pivot_x_px, pivot_y_px, frame_canvas_size, 
-            particle_layers_config, enable_dust,
-            custom_effect_img, eff_extra_rot, eff_flip_h, eff_flip_v, eff_offset, eff_scale, eff_opacity,
-            fade_in_pct_val, fade_out_pct_val, weapon_radius,
-            render_mode_choice, trajectory_mode, linear_travel_dist
-        )
-        for idx in range(sheet_frames_count)
-    ]
-
-    with col_v3:
-        st.subheader("🎬 3. Live GIF Preview")
-        gif_bytes_io = io.BytesIO()
-        frame_delay = int(1000 / anim_fps)
-        rendered_frames[0].save(
-            gif_bytes_io, 
-            format="GIF", 
-            save_all=True, 
-            append_images=rendered_frames[1:], 
-            duration=frame_delay, 
-            loop=0, 
-            disposal=2
-        )
-        gif_bytes = gif_bytes_io.getvalue()
-        
-        st.image(gif_bytes, caption=f"GD Particle Loop Preview ({render_mode_choice})", use_container_width=True)
-        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name=f"Terraria_GD_Particle_{render_mode_choice}.gif", mime="image/gif", use_container_width=True)
-
-    # C# CODE SNIPPET SECTION
-    st.markdown("---")
-    st.markdown("### 💻 4. TModLoader C# Code Generator")
-    item_style = "ItemUseStyleID.Shoot" if trajectory_mode == "➡️ Straight Line / Projectile (Garis Lurus)" else ("ItemUseStyleID.Swing" if "Sword" in weapon_type or "Scythe" in weapon_type else "ItemUseStyleID.Thrust")
-    dust_id_map = {
-        "📁 Custom PNG Particle": "DustID.Electric",
-        "🔥 Fire Embers (Api Unggul)": "DustID.Torch", "✨ Magic Sparkles": "DustID.Electric", "❄️ Ice Crystals": "DustID.IceTorch",
-        "⚡ Electric Sparks": "DustID.PurpleTorch", "🟢 Toxic Slime Bubbles": "DustID.Acid", "🌸 Cherry Blossoms": "DustID.PinkFairy",
-        "🌌 Cosmic Nebulae": "DustID.Shadowflame", "🌋 Lava Sparks": "DustID.Lava", "💥 Explosion Cinders": "DustID.InfernoFork",
-        "☀️ Solar Flares": "DustID.SolarFlare", "🍃 Forest Leaves": "DustID.Grass", "💧 Water Drops": "DustID.Water",
-        "🌟 Starlight Rays": "DustID.Starfury", "🔮 Rune Symbols": "DustID.EnchantedNightcrawler", "🩸 Blood Spatters": "DustID.Blood",
-        "👾 Cyber Glitch Pixels": "DustID.BlueCrystalShard", "💀 Shadow Smoke": "DustID.Smoke", "🪙 Golden Shimmers": "DustID.GoldFlame",
-        "🕷️ Venom Drips": "DustID.Venom", "💨 Wind Gusts": "DustID.Cloud", "⚛️ Quantum Plasma": "DustID.Vortex",
-        "⚡ Void Lightning": "DustID.ShadowbeamStaff", "🌧️ Snow Flakes": "DustID.Snow", "💥 Arcane Orbs": "DustID.Nebula",
-        "💖 Heart Particles": "DustID.Heart"
-    }
-    primary_p_style = particle_layers_config[0]["style"]
-    dust_type_str = dust_id_map.get(primary_p_style, "DustID.Torch")
-    
-    csharp_code = f"""using Microsoft.Xna.Framework;
-using Terraria;
-using Terraria.ID;
-using Terraria.ModLoader;
-
-namespace YourModName.Items
-{{
-    public class CustomGDParticleItem : ModItem
-    {{
-        public override void SetDefaults()
-        {{
-            Item.width = {rotated_base.width};
-            Item.height = {rotated_base.height};
-            Item.useStyle = {item_style};
-            Item.useAnimation = 20;
-            Item.useTime = 20;
-            Item.damage = 50;
-            Item.knockBack = 5f;
-            Item.UseSound = SoundID.Item20;
-            Item.autoReuse = true;
-            Item.value = Item.buyPrice(gold: 2);
-            Item.rare = ItemRarityID.Orange;
-        }}
-
-        public override void MeleeEffects(Player player, Rectangle hitbox)
-        {{
-            if (Main.rand.NextBool(2))
-            {{
-                int dust = Dust.NewDust(
-                    new Vector2(hitbox.X, hitbox.Y), 
-                    hitbox.Width, 
-                    hitbox.Height, 
-                    {dust_type_str}, 
-                    player.velocity.X * 0.3f, 
-                    player.velocity.Y * 0.3f, 
-                    120, 
-                    default(Color), 
-                    1.4f
-                );
-                Main.dust[dust].noGravity = true;
-            }}
-        }}
-    }}
-}}"""
-    st.code(csharp_code, language="csharp")
-    st.download_button("💾 Download Script C# (.cs)", data=csharp_code, file_name="CustomGDParticleItem.cs", mime="text/plain", use_container_width=False)
-
-    # SPRITE SHEET SECTION
-    st.markdown("---")
-    st.markdown("### 🖼️ 5. Frame Inspection & Custom Layout Sprite Sheet")
-    
-    cols_ui = st.columns(min(6, len(rendered_frames)))
-    for i, frm in enumerate(rendered_frames):
-        cols_ui[i % 6].image(frm, caption=f"Frame {i+1}")
-
-    sprite_sheet, final_cols, final_rows = compile_custom_spritesheet(
-        rendered_frames, frame_canvas_size, sheet_orientation, grid_limit, padding_between_frames
-    )
-
-    st.markdown(f"#### Layout Grid Sprite Sheet ({final_cols} Kolom x {final_rows} Baris) - Mode: {render_mode_choice}:")
-    st.image(sprite_sheet, caption=f"Sprite Sheet PNG ({sprite_sheet.width}x{sprite_sheet.height} px)", use_container_width=False)
-
-    buf_sheet = io.BytesIO()
-    sprite_sheet.save(buf_sheet, format="PNG")
-    st.download_button(
-        f"💾 Download Sprite Sheet PNG ({'FX ONLY' if 'FX' in render_mode_choice else 'FULL'})", 
-        data=buf_sheet.getvalue(), 
-        file_name="Terraria_GD_Particle_Sheet.png", 
-        mime="image/png", 
-        use_container_width=True
-    )
-
-    # ZIP EXPORTER SECTION
-    st.markdown("---")
-    st.markdown("### 📦 6. Export Complete Mod Package (.ZIP)")
-
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        zip_file.writestr("CustomItem.png", buf_rot.getvalue())
-        zip_file.writestr("CustomItem_Sheet.png", buf_sheet.getvalue())
-        zip_file.writestr("CustomItem_Animation.gif", gif_bytes)
-        zip_file.writestr("CustomGDParticleItem.cs", csharp_code)
-
-    st.download_button("📦 Download Complete Mod Package (.ZIP)", data=zip_buffer.getvalue(), file_name="Terraria_Mod_GD_Particle_Package.zip", mime="application/zip", use_container_width=True)
-
-else:
-    st.info("👈 Silakan unggah file gambar PNG senjata atau proyektil milikmu di menu sebelah kiri untuk memulai studio!")
+    glow_threshold = sync_control("glow_thresh",
