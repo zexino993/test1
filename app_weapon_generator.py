@@ -8,7 +8,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Terraria Weapon Master Studio v12.0",
+    page_title="Terraria Weapon Master Studio v12.1",
     page_icon="🗡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -73,29 +73,38 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v12.0</div>
-    <div class="studio-subtitle">Studio Modding Terraria Pro: Multi-Layer Particle Engine (Up to 3 Custom/Preset Layers), FX-Only Export, Anti-Crop Canvas, & Mod Package Exporter.</div>
+    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v12.1</div>
+    <div class="studio-subtitle">Studio Modding Terraria Pro: Perfect Slider & Number Input Sync Fix, Multi-Layer Particles, FX-Only Export, & Mod Package Exporter.</div>
 </div>
 """, unsafe_allow_html=True)
 
-# 4. HELPER SYNC FUNCTION
+# 4. FIXED PERFECT SYNC FUNCTION (CALLBACK BASED)
 def sync_control(key_name, default_val, min_val, max_val, step_val, label_text):
     if key_name not in st.session_state:
         st.session_state[key_name] = default_val
 
     col_a, col_b = st.sidebar.columns([2, 1])
     
-    val_num = col_b.number_input(
+    # Callback functions to keep them strictly in sync without conflict
+    def update_from_slider():
+        st.session_state[key_name] = st.session_state[f"{key_name}_slide"]
+        
+    def update_from_number():
+        st.session_state[key_name] = st.session_state[f"{key_name}_num"]
+
+    # Number input
+    col_b.number_input(
         f"{label_text} (#)", min_value=min_val, max_value=max_val, 
-        value=st.session_state[key_name], step=step_val, key=f"{key_name}_num"
+        value=st.session_state[key_name], step=step_val, key=f"{key_name}_num", on_change=update_from_number
     )
-    st.session_state[key_name] = val_num
     
-    val_slide = col_a.slider(
+    # Slider
+    col_a.slider(
         label_text, min_value=min_val, max_value=max_val, 
-        value=st.session_state[key_name], step=step_val, key=f"{key_name}_slide"
+        value=st.session_state[key_name], step=step_val, key=f"{key_name}_slide", on_change=update_from_slider
     )
-    st.session_state[key_name] = val_slide
+    
+    # Ensure session state is updated to whichever triggered last
     return st.session_state[key_name]
 
 # 5. FADE IN & FADE OUT ALPHA CALCULATOR
@@ -159,7 +168,6 @@ def render_single_particle_layer(draw, layer_canvas, canvas_size, weapon_radius,
             p_r = max(1, int((1.0 - age * 0.5) * random.uniform(2, 4)))
             px, py = spawn_x + drift_x, spawn_y + (-random.uniform(2, 8) * age * 10)
 
-            # --- CUSTOM PNG PARTICLE RENDERING ---
             if p_style == "📁 Custom PNG Particle" and custom_part_img is not None:
                 scale_factor = (1.0 - age * 0.4) * custom_part_scale
                 w_p = max(1, int(custom_part_img.width * scale_factor))
@@ -176,7 +184,6 @@ def render_single_particle_layer(draw, layer_canvas, canvas_size, weapon_radius,
                 
                 layer_canvas.paste(rotated_p, (int(px - rotated_p.width // 2), int(py - rotated_p.height // 2)), rotated_p)
 
-            # --- PROCEDURAL PRESET PARTICLES ---
             elif p_style == "🔥 Fire Embers":
                 draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], fill=(255, int(max(0, 200 - age * 200)), 0, alpha))
             elif p_style == "✨ Magic Sparkles":
@@ -314,7 +321,6 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
     else:
         angle = base_rot_angle
 
-    # 1. Overlay Custom PNG Swing Effect Image
     if custom_effect_img is not None and render_mode in ["🌟 Full Weapon + FX", "✨ FX & Particles Only"]:
         eff_layer = overlay_custom_effect_image(
             custom_effect_img, angle, eff_extra_rot, eff_flip_h, eff_flip_v, 
@@ -322,7 +328,6 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
         )
         frame = Image.alpha_composite(frame, eff_layer)
 
-    # 2. Overlay Multi-Layer Dust Particles
     if enable_dust and w_type != "🔱 Spear / Polearm" and render_mode in ["🌟 Full Weapon + FX", "✨ FX & Particles Only"]:
         dust_layer = render_multi_particle_engine(
             canvas_size, weapon_radius, base_rot_angle, swing_arc_range, 
@@ -330,7 +335,6 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
         )
         frame = Image.alpha_composite(frame, dust_layer)
 
-    # 3. Render Main Weapon
     if render_mode in ["🌟 Full Weapon + FX", "🗡️ Weapon Only"]:
         if w_type == "🔱 Spear / Polearm":
             thrust_dist = np.sin((frame_idx / float(max(1, total_frames - 1))) * math.pi) * (canvas_size * 0.25)
@@ -570,7 +574,7 @@ if uploaded_file is not None:
         rotated_base.save(buf_rot, format="PNG")
         st.download_button(f"💾 Download PNG ({base_angle_val}°)", data=buf_rot.getvalue(), file_name=f"Terraria_Item_{base_angle_val}deg.png", mime="image/png", use_container_width=True)
 
-    # RENDER ANIMATION FRAMES (WITH MULTI-LAYER PARTICLES)
+    # RENDER ANIMATION FRAMES
     rendered_frames = [
         generate_weapon_frame(
             src_image, weapon_type, idx, sheet_frames_count, 
