@@ -6,13 +6,13 @@ import math
 import random
 import zipfile
 
-st.set_page_config(page_title="Terraria Weapon Master Studio v6.0", layout="wide")
+st.set_page_config(page_title="Terraria Weapon Master Studio v7.0", layout="wide")
 
-st.title("🗡️ Terraria Weapon Master Studio v6.0 (Live Animation Edition)")
-st.caption("Studio Modder Terraria: Live GIF Animated Previewer, Particle & Dust Trail Engine, Custom Rotation, Procedural & Custom Slash FX, & Package Exporter!")
+st.title("🗡️ Terraria Weapon Master Studio v7.0 (Pro Particle Engine)")
+st.caption("Studio Modder Terraria: Temporal Particle Trailing Engine, Live GIF Previewer, Custom Rotation, & Full Exporter!")
 
 # ==========================================
-# 1. HELPER & ENGINE FUNCTIONS
+# 1. HELPER & ADVANCED PARTICLE ENGINE
 # ==========================================
 def rotate_nearest_neighbor(image, angle):
     return image.rotate(angle, resample=Image.NEAREST, expand=True)
@@ -75,7 +75,8 @@ def generate_procedural_slash_effect(canvas_size, style_type, current_angle, arc
         draw.arc(bbox, start=start_deg, end=end_deg, fill=(255, 255, 255, 255), width=1)
         return layer
 
-def render_dust_particles(canvas_size, current_angle, p_style, p_count, p_spread, p_color, p_seed, frame_idx):
+def render_advanced_dust_particles(canvas_size, base_rot_angle, swing_arc_range, p_style, p_count, p_color, p_seed, frame_idx, total_frames, arc_radius_ratio):
+    """Sistem Partikel Lanjutan dengan Jejak Waktu (Temporal Trailing & Fade)."""
     layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
     center = canvas_size // 2
@@ -83,32 +84,77 @@ def render_dust_particles(canvas_size, current_angle, p_style, p_count, p_spread
     c_hex = p_color.lstrip('#')
     r_c, g_c, b_c = int(c_hex[0:2], 16), int(c_hex[2:4], 16), int(c_hex[4:6], 16)
     
-    random.seed(p_seed + frame_idx * 13)
-    radius_base = canvas_size * 0.38
-    
-    for _ in range(p_count):
-        ang_offset = random.uniform(-p_spread, p_spread)
-        part_angle = math.radians(-current_angle + ang_offset)
-        dist = radius_base + random.uniform(-10, 10)
-        
-        px = center + dist * math.cos(part_angle)
-        py = center + dist * math.sin(part_angle)
-        p_size = random.randint(2, 5)
-        
-        if p_style == "✨ Magic Sparkles":
-            draw.rectangle([px - p_size, py - p_size, px + p_size, py + p_size], fill=(r_c, g_c, b_c, random.randint(180, 255)))
-            draw.rectangle([px - 1, py - 1, px + 1, py + 1], fill=(255, 255, 255, 255))
-        elif p_style == "🔥 Fire Embers":
-            up_y = py - random.randint(2, 6)
-            draw.ellipse([px - p_size, up_y - p_size, px + p_size, up_y + p_size], fill=(255, random.randint(100, 200), 0, random.randint(150, 240)))
-        elif p_style == "❄️ Ice Shards":
-            draw.line([(px - p_size, py - p_size), (px + p_size, py + p_size)], fill=(200, 240, 255, 255), width=2)
-        elif p_style == "⚡ Electric Sparks":
-            draw.line([(px, py), (px + random.randint(-4, 4), py + random.randint(-4, 4))], fill=(r_c, g_c, 255, 255), width=2)
-        else: # Toxic Bubbles
-            draw.ellipse([px - p_size, py - p_size, px + p_size, py + p_size], outline=(0, 255, 100, 220), width=1)
+    base_radius = canvas_size * arc_radius_ratio
+    swing_progress = frame_idx / float(max(1, total_frames - 1))
+    half_range = swing_arc_range / 2.0
 
-    glow = layer.filter(ImageFilter.GaussianBlur(radius=1))
+    random.seed(p_seed)
+    
+    for i in range(p_count):
+        birth_progress = random.uniform(0.0, 1.0)
+        
+        # Hanya tampilkan partikel yang sudah terlahir di timeline swing
+        if swing_progress >= birth_progress:
+            age = (swing_progress - birth_progress) # Rentang umur (0.0 - 1.0)
+            
+            # Hitung sudut lahir di sepanjang ayunan
+            angle_at_birth = (half_range - birth_progress * swing_arc_range) + base_rot_angle
+            spawn_rad = math.radians(-angle_at_birth)
+            
+            # Sebaran posisi lahir
+            r_scatter = random.uniform(-6, 6)
+            spawn_x = center + (base_radius + r_scatter) * math.cos(spawn_rad)
+            spawn_y = center + (base_radius + r_scatter) * math.sin(spawn_rad)
+            
+            drift_x = random.uniform(-4, 4) * age * 10
+            
+            # 1. 🔥 FIRE EMBERS (Melayang ke atas & berubah warna)
+            if p_style == "🔥 Fire Embers":
+                drift_y = -random.uniform(5, 12) * age * 12
+                p_r = max(1, int((1.0 - age * 0.7) * random.uniform(2, 5)))
+                alpha = int(max(0, (1.0 - age) * 255))
+                draw.ellipse(
+                    [spawn_x + drift_x - p_r, spawn_y + drift_y - p_r, spawn_x + drift_x + p_r, spawn_y + drift_y + p_r], 
+                    fill=(255, int(max(0, 200 - age * 200)), 0, alpha)
+                )
+
+            # 2. ✨ MAGIC SPARKLES (Bintang 4 sudut khas Terraria)
+            elif p_style == "✨ Magic Sparkles":
+                drift_y = random.uniform(-3, 3) * age * 8
+                p_r = max(1, int((1.0 - age * 0.5) * random.uniform(2, 4)))
+                alpha = int(max(0, (1.0 - age) * 255))
+                px, py = spawn_x + drift_x, spawn_y + drift_y
+                draw.line([(px - p_r * 2, py), (px + p_r * 2, py)], fill=(r_c, g_c, b_c, alpha), width=1)
+                draw.line([(px, py - p_r * 2), (px, py + p_r * 2)], fill=(r_c, g_c, b_c, alpha), width=1)
+                draw.rectangle([px - 1, py - 1, px + 1, py + 1], fill=(255, 255, 255, alpha))
+
+            # 3. ⚡ ELECTRIC SPARKS (Garis menyambar)
+            elif p_style == "⚡ Electric Sparks":
+                drift_y = random.uniform(-6, 6) * age * 8
+                alpha = int(max(0, (1.0 - age * 1.2) * 255))
+                px, py = spawn_x + drift_x, spawn_y + drift_y
+                dx1, dy1 = random.randint(-4, 4), random.randint(-4, 4)
+                dx2, dy2 = dx1 + random.randint(-4, 4), dy1 + random.randint(-4, 4)
+                draw.line([(px, py), (px + dx1, py + dy1), (px + dx2, py + dy2)], fill=(r_c, g_c, 255, alpha), width=1)
+
+            # 4. ❄️ ICE CRYSTALS (Kristal belah ketupat jatuh)
+            elif p_style == "❄️ Ice Crystals":
+                drift_y = random.uniform(2, 8) * age * 8
+                p_r = max(1, int((1.0 - age * 0.4) * random.uniform(2, 4)))
+                alpha = int(max(0, (1.0 - age) * 240))
+                px, py = spawn_x + drift_x, spawn_y + drift_y
+                draw.polygon([(px, py - p_r), (px + p_r, py), (px, py + p_r), (px - p_r, py)], fill=(200, 240, 255, alpha))
+
+            # 5. 🟢 TOXIC SLIME BUBBLES (Gelembung menetes)
+            else:
+                drift_y = random.uniform(3, 10) * age * 10
+                p_r = max(1, int((1.0 - age * 0.3) * random.uniform(2, 5)))
+                alpha = int(max(0, (1.0 - age) * 220))
+                px, py = spawn_x + drift_x, spawn_y + drift_y
+                draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], outline=(50, 255, 100, alpha), width=1)
+                draw.ellipse([px - 1, py - 1, px + 1, py + 1], fill=(150, 255, 150, alpha))
+
+    glow = layer.filter(ImageFilter.GaussianBlur(radius=2))
     return Image.alpha_composite(glow, layer)
 
 def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v, distance_offset, scale_val, opacity_val, canvas_size):
@@ -142,7 +188,7 @@ def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v
 
 def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_angle, swing_arc_range, pivot_x, pivot_y, canvas_size, 
                             slash_style, glow_color, arc_intensity, arc_span, arc_rad_ratio, 
-                            p_style, p_count, p_spread, p_color, enable_dust,
+                            p_style, p_count, p_color, enable_dust,
                             custom_effect_img, eff_extra_rot, eff_flip_h, eff_flip_v, eff_offset, eff_scale, eff_opacity, show_arm):
     frame = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     canvas_center = canvas_size // 2
@@ -174,9 +220,12 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
         proc_arc = generate_procedural_slash_effect(canvas_size, slash_style, angle, span, arc_rad_ratio, glow_color, arc_intensity)
         frame = Image.alpha_composite(frame, proc_arc)
 
-    # 3. Overlay Dust Particles
+    # 3. Overlay Advanced Dust Particles (Temporal Engine)
     if enable_dust and w_type != "🔱 Spear / Polearm":
-        dust_layer = render_dust_particles(canvas_size, angle, p_style, p_count, p_spread, p_color, p_seed=42, frame_idx=frame_idx)
+        dust_layer = render_advanced_dust_particles(
+            canvas_size, base_rot_angle, swing_arc_range, p_style, p_count, p_color, 
+            p_seed=42, frame_idx=frame_idx, total_frames=total_frames, arc_radius_ratio=arc_rad_ratio
+        )
         frame = Image.alpha_composite(frame, dust_layer)
 
     # 4. Render Main Weapon
@@ -308,11 +357,10 @@ if uploaded_file is not None:
     arc_radius_val = st.sidebar.slider("Jangkauan Radius (% Canvas):", 20, 50, 42, 1) / 100.0
 
     st.sidebar.markdown("---")
-    st.sidebar.header("✨ 6. Particle & Dust Trail Engine")
+    st.sidebar.header("✨ 6. Pro Particle & Dust Trail Engine")
     enable_dust = st.sidebar.checkbox("Aktifkan Dust Trail FX", value=True)
-    particle_style = st.sidebar.selectbox("Model Dust Partikel:", ["✨ Magic Sparkles", "🔥 Fire Embers", "❄️ Ice Shards", "⚡ Electric Sparks", "🟢 Toxic Bubbles"])
-    particle_count = st.sidebar.slider("Kepadatan Dust Partikel:", 5, 50, 20)
-    particle_spread = st.sidebar.slider("Sebaran Dust Arc (°):", 10, 90, 45)
+    particle_style = st.sidebar.selectbox("Model Dust Partikel:", ["✨ Magic Sparkles", "🔥 Fire Embers", "❄️ Ice Crystals", "⚡ Electric Sparks", "🟢 Toxic Slime Bubbles"])
+    particle_count = st.sidebar.slider("Kepadatan Dust Partikel:", 5, 50, 25)
     particle_color = st.sidebar.color_picker("Warna Dust Partikel:", "#00FFFF")
 
     st.sidebar.markdown("---")
@@ -362,7 +410,7 @@ if uploaded_file is not None:
             base_angle_val, swing_arc_range_val, pivot_x_px, pivot_y_px, frame_canvas_size, 
             slash_fx_style, arc_color, arc_power, 
             arc_span_deg, arc_radius_val, 
-            particle_style, particle_count, particle_spread, particle_color, enable_dust,
+            particle_style, particle_count, particle_color, enable_dust,
             custom_eff_img, eff_rot_extra, eff_flip_h, eff_flip_v, eff_dist_offset, eff_scale_val, eff_opacity_val, show_dummy_arm
         )
         for idx in range(sheet_frames_count)
@@ -375,7 +423,6 @@ if uploaded_file is not None:
     with col_anim1:
         st.subheader("🎬 3. Live Animated Swing Preview")
         
-        # Build Animated GIF Bytes
         gif_bytes_io = io.BytesIO()
         frame_delay = int(1000 / anim_fps)
         rendered_frames[0].save(
@@ -395,7 +442,7 @@ if uploaded_file is not None:
     with col_anim2:
         st.subheader("💻 4. TModLoader C# Code Snippet")
         item_style = "ItemUseStyleID.Swing" if "Sword" in weapon_type or "Scythe" in weapon_type else ("ItemUseStyleID.Thrust" if "Spear" in weapon_type else "ItemUseStyleID.Shoot")
-        dust_id_map = {"✨ Magic Sparkles": "DustID.Electric", "🔥 Fire Embers": "DustID.Torch", "❄️ Ice Shards": "DustID.IceTorch", "⚡ Electric Sparks": "DustID.PurpleTorch", "🟢 Toxic Bubbles": "DustID.Acid"}
+        dust_id_map = {"✨ Magic Sparkles": "DustID.Electric", "🔥 Fire Embers": "DustID.Torch", "❄️ Ice Crystals": "DustID.IceTorch", "⚡ Electric Sparks": "DustID.PurpleTorch", "🟢 Toxic Slime Bubbles": "DustID.Acid"}
         dust_type_str = dust_id_map.get(particle_style, "DustID.Electric")
         
         csharp_code = f"""using Microsoft.Xna.Framework;
