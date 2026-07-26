@@ -8,7 +8,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Terraria Weapon Master Studio v14.1",
+    page_title="Terraria Weapon Master Studio v14.2",
     page_icon="🗡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -73,8 +73,8 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v14.1</div>
-    <div class="studio-subtitle">Studio Modding Terraria Pro: GD Physics Particle Engine, Trajectory Modes, & NameError Fix.</div>
+    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v14.2</div>
+    <div class="studio-subtitle">Studio Modding Terraria Pro: GD Physics Particle Engine, Trajectory Modes, & Scope Safety Fix.</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -408,6 +408,7 @@ def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padd
             c = idx % cols
         elif orientation == "Vertical Grid (Atas ke Bawah)":
             c = idx // rows
+            r = idx // rows
             r = idx % rows
         elif orientation == "Horizontal Strip (1 Baris Horizontal)":
             r = 0
@@ -422,7 +423,18 @@ def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padd
     return sheet, cols, rows
 
 # ==========================================
-# 7. SIDEBAR CONTROLS
+# 7. GLOBAL SAFE DEFAULTS FOR CUSTOM EFFECT (FIX NAMEERROR)
+# ==========================================
+custom_eff_img = None
+eff_rot_extra = 0
+eff_flip_h = False
+eff_flip_v = False
+eff_scale_val = 1.0
+eff_dist_offset = 0
+eff_opacity_val = 1.0
+
+# ==========================================
+# 8. SIDEBAR CONTROLS
 # ==========================================
 st.sidebar.markdown("### 🎬 1. Mode Output & Render Switcher")
 render_mode_choice = st.sidebar.radio(
@@ -438,15 +450,6 @@ uploaded_file = st.sidebar.file_uploader("Upload File Senjata / Projectile PNG:"
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ✨ 3. Custom Image FX (Opsional)")
 uploaded_effect = st.sidebar.file_uploader("Upload Efek External PNG:", type=["png"])
-
-# FIX: Inisialisasi variabel custom effect agar aman dari NameError jika tidak di-upload
-custom_eff_img = None
-eff_rot_extra = 0
-eff_flip_h = False
-eff_flip_v = False
-eff_scale_val = 1.0
-eff_dist_offset = 0
-eff_opacity_val = 1.0
 
 if uploaded_effect is not None:
     custom_eff_img = Image.open(uploaded_effect).convert("RGBA")
@@ -501,7 +504,7 @@ if uploaded_file is not None:
     weapon_radius = max(math.hypot(cx - pivot_x_px, cy - pivot_y_px) for cx, cy in corners)
 
     # ==========================================
-    # 8. GEOMETRY DASH STYLE ADVANCED PARTICLE EDITOR
+    # 9. GEOMETRY DASH STYLE ADVANCED PARTICLE EDITOR
     # ==========================================
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🔥 7. GD Style Advanced Particle Editor")
@@ -597,7 +600,7 @@ if uploaded_file is not None:
     anim_fps = sync_control("anim_fps", 10, 5, 30, 1, "Frame Rate Preview (FPS)")
 
     # ==========================================
-    # 9. MAIN STUDIO DASHBOARD VIEW
+    # 10. MAIN STUDIO DASHBOARD VIEW
     # ==========================================
     col_v1, col_v2, col_v3 = st.columns([1, 1, 1])
 
