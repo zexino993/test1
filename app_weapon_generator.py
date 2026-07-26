@@ -6,13 +6,13 @@ import math
 import random
 import zipfile
 
-st.set_page_config(page_title="Terraria Weapon Master Studio v5.0", layout="wide")
+st.set_page_config(page_title="Terraria Weapon Master Studio v6.0", layout="wide")
 
-st.title("🗡️ Terraria Weapon Master Studio v5.0 (Particle & Dust Engine)")
-st.caption("Studio Modder Terraria: Particle & Dust Trail Generator, Custom Rotation, Procedural & Custom Slash FX, Layout Sheet, & C# Dust Code Exporter!")
+st.title("🗡️ Terraria Weapon Master Studio v6.0 (Live Animation Edition)")
+st.caption("Studio Modder Terraria: Live GIF Animated Previewer, Particle & Dust Trail Engine, Custom Rotation, Procedural & Custom Slash FX, & Package Exporter!")
 
 # ==========================================
-# 1. HELPER & PARTICLE ENGINE FUNCTIONS
+# 1. HELPER & ENGINE FUNCTIONS
 # ==========================================
 def rotate_nearest_neighbor(image, angle):
     return image.rotate(angle, resample=Image.NEAREST, expand=True)
@@ -76,7 +76,6 @@ def generate_procedural_slash_effect(canvas_size, style_type, current_angle, arc
         return layer
 
 def render_dust_particles(canvas_size, current_angle, p_style, p_count, p_spread, p_color, p_seed, frame_idx):
-    """Generates Terraria Dust/Particle Trail FX."""
     layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
     center = canvas_size // 2
@@ -84,30 +83,23 @@ def render_dust_particles(canvas_size, current_angle, p_style, p_count, p_spread
     c_hex = p_color.lstrip('#')
     r_c, g_c, b_c = int(c_hex[0:2], 16), int(c_hex[2:4], 16), int(c_hex[4:6], 16)
     
-    # Deterministic Seed per frame
     random.seed(p_seed + frame_idx * 13)
-    
     radius_base = canvas_size * 0.38
     
     for _ in range(p_count):
-        # Angle random spread along arc
         ang_offset = random.uniform(-p_spread, p_spread)
         part_angle = math.radians(-current_angle + ang_offset)
-        
-        # Distance random spread
         dist = radius_base + random.uniform(-10, 10)
         
-        # Particle Position
         px = center + dist * math.cos(part_angle)
         py = center + dist * math.sin(part_angle)
-        
         p_size = random.randint(2, 5)
         
         if p_style == "✨ Magic Sparkles":
             draw.rectangle([px - p_size, py - p_size, px + p_size, py + p_size], fill=(r_c, g_c, b_c, random.randint(180, 255)))
             draw.rectangle([px - 1, py - 1, px + 1, py + 1], fill=(255, 255, 255, 255))
         elif p_style == "🔥 Fire Embers":
-            up_y = py - random.randint(2, 6) # Float Up
+            up_y = py - random.randint(2, 6)
             draw.ellipse([px - p_size, up_y - p_size, px + p_size, up_y + p_size], fill=(255, random.randint(100, 200), 0, random.randint(150, 240)))
         elif p_style == "❄️ Ice Shards":
             draw.line([(px - p_size, py - p_size), (px + p_size, py + p_size)], fill=(200, 240, 255, 255), width=2)
@@ -184,7 +176,7 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
 
     # 3. Overlay Dust Particles
     if enable_dust and w_type != "🔱 Spear / Polearm":
-        dust_layer = render_dust_particles(canvas_size, angle, p_style, p_count, p_spread, p_color, seed_val=42, frame_idx=frame_idx)
+        dust_layer = render_dust_particles(canvas_size, angle, p_style, p_count, p_spread, p_color, p_seed=42, frame_idx=frame_idx)
         frame = Image.alpha_composite(frame, dust_layer)
 
     # 4. Render Main Weapon
@@ -336,8 +328,9 @@ if uploaded_file is not None:
 
     st.sidebar.markdown("---")
     st.sidebar.header("🎬 9. Frame Export Settings")
-    sheet_frames_count = st.sidebar.slider("Jumlah Frame Animasi:", 3, 12, 4)
+    sheet_frames_count = st.sidebar.slider("Jumlah Frame Animasi:", 3, 12, 6)
     frame_canvas_size = st.sidebar.select_slider("Canvas Size per Frame (Px):", options=[64, 80, 96, 128], value=80)
+    anim_fps = st.select_slider("Kecepatan Preview Animasi (FPS):", options=[5, 8, 10, 12, 15, 20], value=10)
 
     # ==========================================
     # 3. MAIN DASHBOARD VIEW
@@ -362,30 +355,50 @@ if uploaded_file is not None:
         rotated_base.save(buf_rot, format="PNG")
         st.download_button(f"💾 Download PNG Senjata ({base_angle_val}°)", data=buf_rot.getvalue(), file_name=f"Terraria_Item_{base_angle_val}deg.png", mime="image/png", use_container_width=True)
 
-    # GLOWMASK SECTION
-    glow_base = None
-    if enable_glowmask:
-        st.markdown("---")
-        st.subheader("🪄 Glowmask Texture (`Item_Glow.png`)")
-        col_g1, col_g2 = st.columns([1, 1])
-        glow_img = generate_glowmask(src_image, threshold=glow_threshold)
-        glow_base = rotate_nearest_neighbor(glow_img, base_angle_val)
-        
-        with col_g1:
-            st.image(glow_base, caption="Glowmask Only (Bagian Menyala)", use_container_width=True)
-        with col_g2:
-            buf_glow = io.BytesIO()
-            glow_base.save(buf_glow, format="PNG")
-            st.download_button("💾 Download Glowmask PNG", data=buf_glow.getvalue(), file_name="Terraria_Item_Glow.png", mime="image/png", use_container_width=True)
+    # RENDER ANIMATION FRAMES
+    rendered_frames = [
+        generate_weapon_frame(
+            src_image, weapon_type, idx, sheet_frames_count, 
+            base_angle_val, swing_arc_range_val, pivot_x_px, pivot_y_px, frame_canvas_size, 
+            slash_fx_style, arc_color, arc_power, 
+            arc_span_deg, arc_radius_val, 
+            particle_style, particle_count, particle_spread, particle_color, enable_dust,
+            custom_eff_img, eff_rot_extra, eff_flip_h, eff_flip_v, eff_dist_offset, eff_scale_val, eff_opacity_val, show_dummy_arm
+        )
+        for idx in range(sheet_frames_count)
+    ]
 
-    # C# CODE GENERATOR (WITH DUST MELEE EFFECTS)
+    # LIVE ANIMATED PREVIEW (GIF PLAYER)
     st.markdown("---")
-    st.subheader("💻 3. TModLoader C# Code Snippet (Dengan Dust Effect)")
-    item_style = "ItemUseStyleID.Swing" if "Sword" in weapon_type or "Scythe" in weapon_type else ("ItemUseStyleID.Thrust" if "Spear" in weapon_type else "ItemUseStyleID.Shoot")
-    dust_id_map = {"✨ Magic Sparkles": "DustID.Electric", "🔥 Flame Wave": "DustID.Torch", "❄️ Ice Shards": "DustID.IceTorch", "⚡ Electric Sparks": "DustID.PurpleTorch", "🟢 Toxic Bubbles": "DustID.Acid"}
-    dust_type_str = dust_id_map.get(particle_style, "DustID.Electric")
-    
-    csharp_code = f"""using Microsoft.Xna.Framework;
+    col_anim1, col_anim2 = st.columns([1, 1])
+
+    with col_anim1:
+        st.subheader("🎬 3. Live Animated Swing Preview")
+        
+        # Build Animated GIF Bytes
+        gif_bytes_io = io.BytesIO()
+        frame_delay = int(1000 / anim_fps)
+        rendered_frames[0].save(
+            gif_bytes_io, 
+            format="GIF", 
+            save_all=True, 
+            append_images=rendered_frames[1:], 
+            duration=frame_delay, 
+            loop=0, 
+            disposal=2
+        )
+        gif_bytes = gif_bytes_io.getvalue()
+        
+        st.image(gif_bytes, caption=f"Live Loop Preview ({anim_fps} FPS)", use_container_width=True)
+        st.download_button("💾 Download Animated GIF Preview (.gif)", data=gif_bytes, file_name="Terraria_Weapon_Swing_Animation.gif", mime="image/gif", use_container_width=True)
+
+    with col_anim2:
+        st.subheader("💻 4. TModLoader C# Code Snippet")
+        item_style = "ItemUseStyleID.Swing" if "Sword" in weapon_type or "Scythe" in weapon_type else ("ItemUseStyleID.Thrust" if "Spear" in weapon_type else "ItemUseStyleID.Shoot")
+        dust_id_map = {"✨ Magic Sparkles": "DustID.Electric", "🔥 Fire Embers": "DustID.Torch", "❄️ Ice Shards": "DustID.IceTorch", "⚡ Electric Sparks": "DustID.PurpleTorch", "🟢 Toxic Bubbles": "DustID.Acid"}
+        dust_type_str = dust_id_map.get(particle_style, "DustID.Electric")
+        
+        csharp_code = f"""using Microsoft.Xna.Framework;
 using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
@@ -430,35 +443,38 @@ namespace YourModName.Items
         }}
     }}
 }}"""
-    st.code(csharp_code, language="csharp")
-    st.download_button("💾 Download Script C# (.cs)", data=csharp_code, file_name="CustomWeapon.cs", mime="text/plain", use_container_width=False)
+        st.code(csharp_code, language="csharp")
+        st.download_button("💾 Download Script C# (.cs)", data=csharp_code, file_name="CustomWeapon.cs", mime="text/plain", use_container_width=True)
 
-    # ANIMATED TRAJECTORY SHEET
+    # GLOWMASK SECTION
+    glow_base = None
+    if enable_glowmask:
+        st.markdown("---")
+        st.subheader("🪄 Glowmask Texture (`Item_Glow.png`)")
+        col_g1, col_g2 = st.columns([1, 1])
+        glow_img = generate_glowmask(src_image, threshold=glow_threshold)
+        glow_base = rotate_nearest_neighbor(glow_img, base_angle_val)
+        
+        with col_g1:
+            st.image(glow_base, caption="Glowmask Only (Bagian Menyala)", use_container_width=True)
+        with col_g2:
+            buf_glow = io.BytesIO()
+            glow_base.save(buf_glow, format="PNG")
+            st.download_button("💾 Download Glowmask PNG", data=buf_glow.getvalue(), file_name="Terraria_Item_Glow.png", mime="image/png", use_container_width=True)
+
+    # SPRITE SHEET DISPLAY & EXPORT
     st.markdown("---")
-    st.subheader("🎬 4. Multi-Type Trajectory & Dust Trail Sheet")
+    st.subheader("🖼️ 5. Frame Inspection & Custom Layout Sprite Sheet")
     
-    rendered_frames = [
-        generate_weapon_frame(
-            src_image, weapon_type, idx, sheet_frames_count, 
-            base_angle_val, swing_arc_range_val, pivot_x_px, pivot_y_px, frame_canvas_size, 
-            slash_fx_style, arc_color, arc_power, 
-            arc_span_deg, arc_radius_val, 
-            particle_style, particle_count, particle_spread, particle_color, enable_dust,
-            custom_eff_img, eff_rot_extra, eff_flip_h, eff_flip_v, eff_dist_offset, eff_scale_val, eff_opacity_val, show_dummy_arm
-        )
-        for idx in range(sheet_frames_count)
-    ]
-
     cols_ui = st.columns(min(6, len(rendered_frames)))
     for i, frm in enumerate(rendered_frames):
         cols_ui[i % 6].image(frm, caption=f"Frame {i+1}")
 
-    # Build Custom Sprite Sheet
     sprite_sheet, final_cols, final_rows = compile_custom_spritesheet(
         rendered_frames, frame_canvas_size, sheet_orientation, grid_limit, padding_between_frames
     )
 
-    st.markdown(f"#### 🖼️ Custom Layout Sprite Sheet ({final_cols} Kolom x {final_rows} Baris):")
+    st.markdown(f"#### Layout Grid Sprite Sheet ({final_cols} Kolom x {final_rows} Baris):")
     st.image(sprite_sheet, caption=f"Sprite Sheet PNG ({sprite_sheet.width}x{sprite_sheet.height} px) - Orientasi: {sheet_orientation}", use_container_width=False)
 
     buf_sheet = io.BytesIO()
@@ -467,7 +483,7 @@ namespace YourModName.Items
 
     # ALL-IN-ONE ZIP PACKAGE EXPORTER
     st.markdown("---")
-    st.subheader("📦 5. Export Complete Mod Package (ZIP)")
+    st.subheader("📦 6. Export Complete Mod Package (ZIP)")
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
@@ -475,6 +491,7 @@ namespace YourModName.Items
         if glow_base:
             zip_file.writestr("CustomWeapon_Glow.png", buf_glow.getvalue())
         zip_file.writestr("CustomWeapon_SwingSheet.png", buf_sheet.getvalue())
+        zip_file.writestr("CustomWeapon_Animation.gif", gif_bytes)
         zip_file.writestr("CustomWeapon.cs", csharp_code)
 
     st.download_button("📦 Download Complete Mod Package (.ZIP)", data=zip_buffer.getvalue(), file_name="Terraria_Mod_Weapon_Package.zip", mime="application/zip", use_container_width=True)
