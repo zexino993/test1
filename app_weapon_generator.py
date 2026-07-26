@@ -5,10 +5,10 @@ import io
 import math
 import zipfile
 
-st.set_page_config(page_title="Terraria Weapon Master Studio v3.2 Pro", layout="wide")
+st.set_page_config(page_title="Terraria Weapon Master Studio v3.3 Master", layout="wide")
 
-st.title("🗡️ Terraria Weapon Master Studio v3.2 Pro")
-st.caption("Studio Modder Terraria: Improved Custom Swing Arc FX, Download Terpisah Setiap Aset, Custom Layout, & Zip Package!")
+st.title("🗡️ Terraria Weapon Master Studio v3.3 Master")
+st.caption("Studio Modder Terraria: Custom Image Swing Effect Generator, Procedural Arc FX, Player Arm Visualizer, & Complete Exporter!")
 
 # ==========================================
 # 1. HELPER FUNCTIONS
@@ -32,8 +32,8 @@ def render_player_arm(canvas_size):
     draw.rectangle([center - 7, center + 12, center + 7, center + 22], fill=(80, 100, 180, 160)) # Shirt
     return arm
 
-def generate_improved_swing_arc(canvas_size, current_angle, arc_span, arc_radius_ratio, glow_color, arc_intensity):
-    """Menghasilkan efek pendaran busur tebasan energi (Swing Arc) multi-layer yang halus dan profesional."""
+def generate_procedural_swing_arc(canvas_size, current_angle, arc_span, arc_radius_ratio, glow_color, arc_intensity):
+    """Membuat efek pendaran tebasan sintetis (Procedural Glow Arc)."""
     arc_layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(arc_layer)
     center = canvas_size // 2
@@ -41,43 +41,94 @@ def generate_improved_swing_arc(canvas_size, current_angle, arc_span, arc_radius
     radius = int(canvas_size * arc_radius_ratio)
     bbox = [center - radius, center - radius, center + radius, center + radius]
     
-    # Hitung Rentang Sudut Tebasan
-    # Sudut visual diurutkan agar mengikuti orientasi ayunan pedang Terraria
     start_deg = -current_angle - (arc_span / 2.0)
     end_deg = -current_angle + (arc_span / 2.0)
     
     c_hex = glow_color.lstrip('#')
     r_c, g_c, b_c = int(c_hex[0:2], 16), int(c_hex[2:4], 16), int(c_hex[4:6], 16)
     
-    # 1. Outer Soft Glow Layers
     for i in range(3):
         w = int((6 + i * 4) * arc_intensity)
         alpha = int((140 - i * 35) * min(1.0, arc_intensity))
         draw.arc(bbox, start=start_deg, end=end_deg, fill=(r_c, g_c, b_c, alpha), width=max(1, w))
         
-    # 2. Core Bright Hotspot Center
     draw.arc(bbox, start=start_deg, end=end_deg, fill=(255, 255, 255, int(220 * min(1.0, arc_intensity))), width=max(2, int(3 * arc_intensity)))
     
-    # Blur halus untuk pendaran sihir
     arc_glow = arc_layer.filter(ImageFilter.GaussianBlur(radius=3))
-    final_arc = Image.alpha_composite(arc_glow, arc_layer)
-    
-    return final_arc
+    return Image.alpha_composite(arc_glow, arc_layer)
 
-def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, pivot_x, pivot_y, canvas_size, glow_color, arc_intensity, arc_span, arc_rad_ratio, show_arm):
+def overlay_custom_effect_image(effect_img, angle, distance_offset, scale_val, opacity_val, canvas_size):
+    """Menyesuaikan posisi, rotasi, skala, dan transparansi dari Gambar Efek Custom Pengguna."""
+    canvas_center = canvas_size // 2
+    
+    # 1. Resize Efek
+    new_w = max(1, int(effect_img.width * scale_val))
+    new_h = max(1, int(effect_img.height * scale_val))
+    resized_effect = effect_img.resize((new_w, new_h), resample=Image.NEAREST)
+    
+    # 2. Adjust Opacity/Alpha
+    if opacity_val < 1.0:
+        eff_np = np.array(resized_effect).copy()
+        eff_np[:, :, 3] = (eff_np[:, :, 3] * opacity_val).astype(np.uint8)
+        resized_effect = Image.fromarray(eff_np)
+        
+    # 3. Rotate Effect
+    rotated_eff = rotate_nearest_neighbor(resized_effect, angle)
+    
+    # 4. Offset Position
+    rad = math.radians(-angle)
+    off_x = int(distance_offset * math.cos(rad))
+    off_y = int(distance_offset * math.sin(rad))
+    
+    paste_x = canvas_center - (rotated_eff.width // 2) + off_x
+    paste_y = canvas_center - (rotated_eff.height // 2) + off_y
+    
+    layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+    layer.paste(rotated_eff, (paste_x, paste_y), rotated_eff)
+    return layer
+
+def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, pivot_x, pivot_y, canvas_size, 
+                            glow_color, arc_intensity, arc_span, arc_rad_ratio, 
+                            custom_effect_img, eff_offset, eff_scale, eff_opacity, show_arm):
     frame = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     canvas_center = canvas_size // 2
 
-    # Render Player Arm
+    # Render Arm
     if show_arm:
-        arm_layer = render_player_arm(canvas_size)
-        frame = Image.alpha_composite(frame, arm_layer)
+        frame = Image.alpha_composite(frame, render_player_arm(canvas_size))
 
-    # 1. SWORD SWING
+    # Hitung Sudut Rotasi Senjata
     if w_type == "⚔️ Broadsword / Sword":
         angle = np.linspace(65, -65, total_frames)[frame_idx] + 45
+    elif w_type == "🌙 Scythe / Axe (360° Spin)":
+        angle = (frame_idx / float(total_frames)) * 360
+    elif w_type == "🪀 Yoyo Spin":
+        angle = (frame_idx / float(total_frames)) * 180
+    else: # Spear
+        angle = 45
+
+    # 1. Overlay Custom Image Swing Effect (Jika Diunggah)
+    if custom_effect_img is not None:
+        eff_layer = overlay_custom_effect_image(custom_effect_img, angle, eff_offset, eff_scale, eff_opacity, canvas_size)
+        frame = Image.alpha_composite(frame, eff_layer)
+
+    # 2. Overlay Procedural Glow Arc FX
+    if arc_intensity > 0 and w_type != "🔱 Spear / Polearm":
+        span = 360 if "Scythe" in w_type else arc_span
+        proc_arc = generate_procedural_swing_arc(canvas_size, angle, span, arc_rad_ratio, glow_color, arc_intensity)
+        frame = Image.alpha_composite(frame, proc_arc)
+
+    # 3. Render Senjata Utama
+    if w_type == "🔱 Spear / Polearm":
+        thrust_dist = np.sin((frame_idx / float(max(1, total_frames - 1))) * math.pi) * (canvas_size * 0.25)
+        rotated = rotate_nearest_neighbor(weapon_img, 45)
+        offset_x = int(thrust_dist * math.cos(math.radians(45)))
+        offset_y = int(-thrust_dist * math.sin(math.radians(45)))
+        paste_x = canvas_center - (rotated.width // 2) + offset_x
+        paste_y = canvas_center - (rotated.height // 2) + offset_y
+        frame.paste(rotated, (paste_x, paste_y), rotated)
+    else:
         rotated = rotate_nearest_neighbor(weapon_img, angle)
-        
         orig_cx, orig_cy = weapon_img.width / 2.0, weapon_img.height / 2.0
         rad = math.radians(-angle)
         cos_a, sin_a = math.cos(rad), math.sin(rad)
@@ -86,47 +137,10 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, pivot_x, 
         
         paste_x, paste_y = int(canvas_center - rx), int(canvas_center - ry)
         
-        if arc_intensity > 0:
-            arc_fx = generate_improved_swing_arc(canvas_size, angle, arc_span, arc_rad_ratio, glow_color, arc_intensity)
-            frame = Image.alpha_composite(frame, arc_fx)
-
-        frame.paste(rotated, (paste_x, paste_y), rotated)
-
-    # 2. SPEAR THRUST
-    elif w_type == "🔱 Spear / Polearm":
-        angle = 45
-        thrust_dist = np.sin((frame_idx / float(max(1, total_frames - 1))) * math.pi) * (canvas_size * 0.25)
-        rotated = rotate_nearest_neighbor(weapon_img, angle)
-        
-        offset_x = int(thrust_dist * math.cos(math.radians(45)))
-        offset_y = int(-thrust_dist * math.sin(math.radians(45)))
-        
-        paste_x = canvas_center - (rotated.width // 2) + offset_x
-        paste_y = canvas_center - (rotated.height // 2) + offset_y
-        frame.paste(rotated, (paste_x, paste_y), rotated)
-
-    # 3. SCYTHE FULL SPIN (360 Deg)
-    elif w_type == "🌙 Scythe / Axe (360° Spin)":
-        angle = (frame_idx / float(total_frames)) * 360
-        rotated = rotate_nearest_neighbor(weapon_img, angle)
-        paste_x = canvas_center - (rotated.width // 2)
-        paste_y = canvas_center - (rotated.height // 2)
-        
-        if arc_intensity > 0:
-            arc_fx = generate_improved_swing_arc(canvas_size, angle, 360, arc_rad_ratio, glow_color, arc_intensity)
-            frame = Image.alpha_composite(frame, arc_fx)
-
-        frame.paste(rotated, (paste_x, paste_y), rotated)
-
-    # 4. YOYO SPIN
-    else:
-        angle = (frame_idx / float(total_frames)) * 180
-        rotated = rotate_nearest_neighbor(weapon_img, angle)
-        paste_x = canvas_center - (rotated.width // 2)
-        paste_y = canvas_center - (rotated.height // 2)
-        
-        draw = ImageDraw.Draw(frame)
-        draw.line([(0, canvas_size), (canvas_center, canvas_center)], fill=(220, 220, 220, 200), width=1)
+        if w_type == "🪀 Yoyo Spin":
+            draw = ImageDraw.Draw(frame)
+            draw.line([(0, canvas_size), (canvas_center, canvas_center)], fill=(220, 220, 220, 200), width=1)
+            
         frame.paste(rotated, (paste_x, paste_y), rotated)
 
     return frame
@@ -176,20 +190,36 @@ def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padd
 # 2. SIDEBAR CONTROLS
 # ==========================================
 st.sidebar.header("📁 1. Input Sprite Senjata")
-uploaded_file = st.sidebar.file_uploader("Upload PNG Senjata:", type=["png"])
+uploaded_file = st.sidebar.file_uploader("Upload PNG Senjata Utama:", type=["png"])
+
+st.sidebar.markdown("---")
+st.sidebar.header("✨ 2. Custom Image Swing Effect")
+uploaded_effect = st.sidebar.file_uploader("Upload PNG Efek Tebasan Custom (Opsional):", type=["png"], help="Unggah sprite tebasan khusus seperti petir, api, atau tebasan sihir.")
+
+if uploaded_effect is not None:
+    custom_eff_img = Image.open(uploaded_effect).convert("RGBA")
+    st.sidebar.markdown("**Transformasi Efek Custom:**")
+    eff_scale_val = st.sidebar.slider("Skala/Ukuran Efek Custom:", 0.2, 3.0, 1.0, 0.1)
+    eff_dist_offset = st.sidebar.slider("Offset Jarak Efek dari Gagang:", -50, 80, 15, 1)
+    eff_opacity_val = st.sidebar.slider("Transparansi (Opacity):", 0.1, 1.0, 0.9, 0.05)
+else:
+    custom_eff_img = None
+    eff_scale_val = 1.0
+    eff_dist_offset = 0
+    eff_opacity_val = 1.0
 
 if uploaded_file is not None:
     src_image = Image.open(uploaded_file).convert("RGBA")
     
     st.sidebar.markdown("---")
-    st.sidebar.header("⚙️ 2. Tipe Senjata & Trajectory")
+    st.sidebar.header("⚙️ 3. Tipe Senjata & Trajectory")
     weapon_type = st.sidebar.selectbox(
         "Kategori Senjata:",
         ["⚔️ Broadsword / Sword", "🔱 Spear / Polearm", "🌙 Scythe / Axe (360° Spin)", "🪀 Yoyo Spin"]
     )
     
     st.sidebar.markdown("---")
-    st.sidebar.header("📐 3. Grip Pivot Position")
+    st.sidebar.header("📐 4. Grip Pivot Position")
     pivot_x_pct = st.sidebar.slider("Grip Posisi X (%):", 0, 100, 25)
     pivot_y_pct = st.sidebar.slider("Grip Posisi Y (%):", 0, 100, 75)
     pivot_x_px = int((pivot_x_pct / 100.0) * src_image.width)
@@ -198,15 +228,15 @@ if uploaded_file is not None:
     show_dummy_arm = st.sidebar.checkbox("Tampilkan Dummy Arm Karakter", value=True)
 
     st.sidebar.markdown("---")
-    st.sidebar.header("✨ 4. Kustomisasi Swing Arc FX")
-    enable_arc = st.sidebar.checkbox("Aktifkan Swing Arc FX", value=True)
-    arc_color = st.sidebar.color_picker("Warna Pendaran Arc:", "#00FFFF")
+    st.sidebar.header("🌈 5. Procedural Glow Arc FX")
+    enable_arc = st.sidebar.checkbox("Aktifkan Procedural Arc FX", value=True)
+    arc_color = st.sidebar.color_picker("Warna Procedural Arc:", "#00FFFF")
     arc_power = st.sidebar.slider("Intensitas Cahaya Arc:", 0.0, 2.5, 1.2, 0.1)
     arc_span_deg = st.sidebar.slider("Sudut Panjang Busur Arc (°):", 30, 180, 90, 5)
     arc_radius_val = st.sidebar.slider("Jangkauan Radius Arc (% Canvas):", 20, 50, 42, 1) / 100.0
 
     st.sidebar.markdown("---")
-    st.sidebar.header("🖼️ 5. Pengaturan Layout Sprite Sheet")
+    st.sidebar.header("🖼️ 6. Pengaturan Layout Sprite Sheet")
     sheet_orientation = st.sidebar.selectbox(
         "Arah Susunan (Orientasi Layout):",
         [
@@ -220,12 +250,12 @@ if uploaded_file is not None:
     padding_between_frames = st.sidebar.slider("Jarak Antar Frame (Padding Px):", 0, 16, 0)
 
     st.sidebar.markdown("---")
-    st.sidebar.header("🪄 6. Glowmask Generator")
+    st.sidebar.header("🪄 7. Glowmask Generator")
     enable_glowmask = st.sidebar.checkbox("Generate Glowmask", value=False)
     glow_threshold = st.sidebar.slider("Glow Threshold:", 50, 255, 180)
 
     st.sidebar.markdown("---")
-    st.sidebar.header("🎬 7. Frame Export Settings")
+    st.sidebar.header("🎬 8. Frame Export Settings")
     sheet_frames_count = st.sidebar.slider("Jumlah Frame Animasi:", 3, 12, 4)
     frame_canvas_size = st.sidebar.select_slider("Canvas Size per Frame (Px):", options=[64, 80, 96, 128], value=80)
 
@@ -248,16 +278,9 @@ if uploaded_file is not None:
         rotated_45 = rotate_nearest_neighbor(src_image, 45)
         st.image(rotated_45, caption=f"Terraria Ready 45° ({rotated_45.width}x{rotated_45.height} px)", use_container_width=True)
         
-        # FITUR DOWNLOAD TERPISAH: Single 45 Degree PNG
         buf_rot45 = io.BytesIO()
         rotated_45.save(buf_rot45, format="PNG")
-        st.download_button(
-            label="💾 Download PNG Senjata 45°",
-            data=buf_rot45.getvalue(),
-            file_name="Terraria_Item_45deg.png",
-            mime="image/png",
-            use_container_width=True
-        )
+        st.download_button("💾 Download PNG Senjata 45°", data=buf_rot45.getvalue(), file_name="Terraria_Item_45deg.png", mime="image/png", use_container_width=True)
 
     # GLOWMASK SECTION
     glow_45 = None
@@ -271,17 +294,9 @@ if uploaded_file is not None:
         with col_g1:
             st.image(glow_45, caption="Glowmask Only (Bagian Menyala)", use_container_width=True)
         with col_g2:
-            st.write("Tekstur bagian menyala di tempat gelap untuk Terraria.")
-            # FITUR DOWNLOAD TERPISAH: Glowmask PNG
             buf_glow = io.BytesIO()
             glow_45.save(buf_glow, format="PNG")
-            st.download_button(
-                label="💾 Download Glowmask PNG",
-                data=buf_glow.getvalue(),
-                file_name="Terraria_Item_Glow.png",
-                mime="image/png",
-                use_container_width=True
-            )
+            st.download_button("💾 Download Glowmask PNG", data=buf_glow.getvalue(), file_name="Terraria_Item_Glow.png", mime="image/png", use_container_width=True)
 
     # C# CODE GENERATOR
     st.markdown("---")
@@ -314,25 +329,19 @@ namespace YourModName.Items
 }}"""
     st.code(csharp_code, language="csharp")
     
-    # FITUR DOWNLOAD TERPISAH: C# Script File
-    st.download_button(
-        label="💾 Download Script C# (.cs)",
-        data=csharp_code,
-        file_name="CustomWeapon.cs",
-        mime="text/plain",
-        use_container_width=False
-    )
+    st.download_button("💾 Download Script C# (.cs)", data=csharp_code, file_name="CustomWeapon.cs", mime="text/plain", use_container_width=False)
 
-    # ANIMATED TRAJECTORY SHEET
+    # ANIMATED TRAJECTORY SHEET (WITH CUSTOM IMAGE EFFECT)
     st.markdown("---")
-    st.subheader("🎬 4. Multi-Type Weapon Trajectory & Custom Sprite Sheet")
+    st.subheader("🎬 4. Multi-Type Trajectory & Custom Image Effect Sheet")
     
     rendered_frames = [
         generate_weapon_frame(
             src_image, weapon_type, idx, sheet_frames_count, 
             pivot_x_px, pivot_y_px, frame_canvas_size, 
             arc_color, arc_power if enable_arc else 0.0, 
-            arc_span_deg, arc_radius_val, show_dummy_arm
+            arc_span_deg, arc_radius_val, 
+            custom_eff_img, eff_dist_offset, eff_scale_val, eff_opacity_val, show_dummy_arm
         )
         for idx in range(sheet_frames_count)
     ]
@@ -349,21 +358,13 @@ namespace YourModName.Items
     st.markdown(f"#### 🖼️ Custom Layout Sprite Sheet ({final_cols} Kolom x {final_rows} Baris):")
     st.image(sprite_sheet, caption=f"Sprite Sheet PNG ({sprite_sheet.width}x{sprite_sheet.height} px) - Orientasi: {sheet_orientation}", use_container_width=False)
 
-    # FITUR DOWNLOAD TERPISAH: Sprite Sheet PNG
     buf_sheet = io.BytesIO()
     sprite_sheet.save(buf_sheet, format="PNG")
-    st.download_button(
-        label="💾 Download Sprite Sheet PNG",
-        data=buf_sheet.getvalue(),
-        file_name="Terraria_Weapon_SwingSheet.png",
-        mime="image/png",
-        use_container_width=True
-    )
+    st.download_button("💾 Download Sprite Sheet PNG", data=buf_sheet.getvalue(), file_name="Terraria_Weapon_SwingSheet.png", mime="image/png", use_container_width=True)
 
     # ALL-IN-ONE ZIP PACKAGE EXPORTER
     st.markdown("---")
     st.subheader("📦 5. Export Complete Mod Package (ZIP)")
-    st.write("Atau unduh semua aset sekaligus dalam 1 file `.zip` ringkas:")
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
@@ -373,13 +374,7 @@ namespace YourModName.Items
         zip_file.writestr("CustomWeapon_SwingSheet.png", buf_sheet.getvalue())
         zip_file.writestr("CustomWeapon.cs", csharp_code)
 
-    st.download_button(
-        label="📦 Download Complete Mod Package (.ZIP)",
-        data=zip_buffer.getvalue(),
-        file_name="Terraria_Mod_Weapon_Package.zip",
-        mime="application/zip",
-        use_container_width=True
-    )
+    st.download_button("📦 Download Complete Mod Package (.ZIP)", data=zip_buffer.getvalue(), file_name="Terraria_Mod_Weapon_Package.zip", mime="application/zip", use_container_width=True)
 
 else:
     st.info("👈 Silakan unggah file gambar PNG senjata milikmu di menu sebelah kiri untuk memulai!")
