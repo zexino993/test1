@@ -8,7 +8,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Terraria Weapon Master Studio v12.1",
+    page_title="Terraria Weapon Master Studio v13.0",
     page_icon="🗡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -73,8 +73,8 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v12.1</div>
-    <div class="studio-subtitle">Studio Modding Terraria Pro: Perfect Slider & Number Input Sync Fix, Multi-Layer Particles, FX-Only Export, & Mod Package Exporter.</div>
+    <div class="studio-title">🗡️ Terraria Weapon Master Studio Pro v13.0</div>
+    <div class="studio-subtitle">Studio Modding Terraria Pro: Arc Swing & Straight Line Projectile Trajectory Modes, Multi-Layer Particles, & FX Export.</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -85,26 +85,22 @@ def sync_control(key_name, default_val, min_val, max_val, step_val, label_text):
 
     col_a, col_b = st.sidebar.columns([2, 1])
     
-    # Callback functions to keep them strictly in sync without conflict
     def update_from_slider():
         st.session_state[key_name] = st.session_state[f"{key_name}_slide"]
         
     def update_from_number():
         st.session_state[key_name] = st.session_state[f"{key_name}_num"]
 
-    # Number input
     col_b.number_input(
         f"{label_text} (#)", min_value=min_val, max_value=max_val, 
         value=st.session_state[key_name], step=step_val, key=f"{key_name}_num", on_change=update_from_number
     )
     
-    # Slider
     col_a.slider(
         label_text, min_value=min_val, max_value=max_val, 
         value=st.session_state[key_name], step=step_val, key=f"{key_name}_slide", on_change=update_from_slider
     )
     
-    # Ensure session state is updated to whichever triggered last
     return st.session_state[key_name]
 
 # 5. FADE IN & FADE OUT ALPHA CALCULATOR
@@ -139,51 +135,52 @@ def generate_glowmask(image, threshold=200):
     img_np[mask, 3] = 0
     return Image.fromarray(img_np)
 
-def render_single_particle_layer(draw, layer_canvas, canvas_size, weapon_radius, base_rot_angle, swing_arc_range, p_style, p_count, p_color, p_seed, frame_idx, total_frames, fade_mult, custom_part_img, custom_part_scale):
+def render_single_particle_layer(draw, layer_canvas, canvas_size, weapon_radius, base_rot_angle, swing_arc_range, p_style, p_count, p_color, p_seed, frame_idx, total_frames, fade_mult, custom_part_img, custom_part_scale, trajectory_mode, linear_travel_dist):
     center = canvas_size // 2
     c_hex = p_color.lstrip('#')
     r_c, g_c, b_c = int(c_hex[0:2], 16), int(c_hex[2:4], 16), int(c_hex[4:6], 16)
     
-    base_radius = weapon_radius * 0.85
     swing_progress = frame_idx / float(max(1, total_frames - 1))
-    half_range = swing_arc_range / 2.0
-
     random.seed(p_seed)
     
     for i in range(p_count):
         birth_progress = random.uniform(0.0, 1.0)
         if swing_progress >= birth_progress:
             age = (swing_progress - birth_progress)
-            angle_at_birth = (half_range - birth_progress * swing_arc_range) + base_rot_angle
-            spawn_rad = math.radians(-angle_at_birth)
             
-            r_scatter = random.uniform(-8, 8)
-            spawn_x = center + (base_radius + r_scatter) * math.cos(spawn_rad)
-            spawn_y = center + (base_radius + r_scatter) * math.sin(spawn_rad)
-            drift_x = random.uniform(-4, 4) * age * 10
-            
+            if trajectory_mode == "🌀 Arc Swing (Rotasi Berputar)":
+                base_radius = weapon_radius * 0.85
+                half_range = swing_arc_range / 2.0
+                angle_at_birth = (half_range - birth_progress * swing_arc_range) + base_rot_angle
+                spawn_rad = math.radians(-angle_at_birth)
+                r_scatter = random.uniform(-8, 8)
+                spawn_x = center + (base_radius + r_scatter) * math.cos(spawn_rad)
+                spawn_y = center + (base_radius + r_scatter) * math.sin(spawn_rad)
+                drift_x = random.uniform(-4, 4) * age * 10
+                px, py = spawn_x + drift_x, spawn_y + (-random.uniform(2, 8) * age * 10)
+            else:  # Straight Line / Projectile Mode
+                travel_progress = swing_progress * linear_travel_dist
+                rad_lin = math.radians(-base_rot_angle)
+                current_lin_x = center + travel_progress * math.cos(rad_lin)
+                current_lin_y = center + travel_progress * math.sin(rad_lin)
+                px = current_lin_x + random.uniform(-10, 10)
+                py = current_lin_y + random.uniform(-10, 10)
+
             base_alpha = max(0, (1.0 - age) * 255)
             alpha = int(base_alpha * fade_mult)
-            
             p_r = max(1, int((1.0 - age * 0.5) * random.uniform(2, 4)))
-            px, py = spawn_x + drift_x, spawn_y + (-random.uniform(2, 8) * age * 10)
 
             if p_style == "📁 Custom PNG Particle" and custom_part_img is not None:
                 scale_factor = (1.0 - age * 0.4) * custom_part_scale
                 w_p = max(1, int(custom_part_img.width * scale_factor))
                 h_p = max(1, int(custom_part_img.height * scale_factor))
-                
                 resized_p = custom_part_img.resize((w_p, h_p), resample=Image.NEAREST)
-                
                 p_np = np.array(resized_p).copy()
                 p_np[:, :, 3] = (p_np[:, :, 3] * (alpha / 255.0)).astype(np.uint8)
                 resized_p = Image.fromarray(p_np)
-                
                 rot_deg = random.randint(0, 360)
                 rotated_p = rotate_nearest_neighbor(resized_p, rot_deg)
-                
                 layer_canvas.paste(rotated_p, (int(px - rotated_p.width // 2), int(py - rotated_p.height // 2)), rotated_p)
-
             elif p_style == "🔥 Fire Embers":
                 draw.ellipse([px - p_r, py - p_r, px + p_r, py + p_r], fill=(255, int(max(0, 200 - age * 200)), 0, alpha))
             elif p_style == "✨ Magic Sparkles":
@@ -238,38 +235,24 @@ def render_single_particle_layer(draw, layer_canvas, canvas_size, weapon_radius,
             else: 
                 draw.polygon([(px - 2, py), (px, py - 2), (px + 2, py), (px, py + 3)], fill=(255, 105, 180, alpha))
 
-def render_multi_particle_engine(canvas_size, weapon_radius, base_rot_angle, swing_arc_range, particle_layers, frame_idx, total_frames, fade_mult):
+def render_multi_particle_engine(canvas_size, weapon_radius, base_rot_angle, swing_arc_range, particle_layers, frame_idx, total_frames, fade_mult, trajectory_mode, linear_travel_dist):
     master_layer = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
-    
     for idx, p_cfg in enumerate(particle_layers):
         if not p_cfg.get("enabled", True):
             continue
-            
         layer_canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(layer_canvas)
-        
         render_single_particle_layer(
-            draw=draw,
-            layer_canvas=layer_canvas,
-            canvas_size=canvas_size,
-            weapon_radius=weapon_radius,
-            base_rot_angle=base_rot_angle,
-            swing_arc_range=swing_arc_range,
-            p_style=p_cfg["style"],
-            p_count=p_cfg["count"],
-            p_color=p_cfg["color"],
-            p_seed=42 + idx * 99,
-            frame_idx=frame_idx,
-            total_frames=total_frames,
-            fade_mult=fade_mult,
-            custom_part_img=p_cfg.get("custom_img", None),
-            custom_part_scale=p_cfg.get("custom_scale", 1.0)
+            draw=draw, layer_canvas=layer_canvas, canvas_size=canvas_size,
+            weapon_radius=weapon_radius, base_rot_angle=base_rot_angle, swing_arc_range=swing_arc_range,
+            p_style=p_cfg["style"], p_count=p_cfg["count"], p_color=p_cfg["color"],
+            p_seed=42 + idx * 99, frame_idx=frame_idx, total_frames=total_frames, fade_mult=fade_mult,
+            custom_part_img=p_cfg.get("custom_img", None), custom_part_scale=p_cfg.get("custom_scale", 1.0),
+            trajectory_mode=trajectory_mode, linear_travel_dist=linear_travel_dist
         )
-        
         glow = layer_canvas.filter(ImageFilter.GaussianBlur(radius=2))
         combined = Image.alpha_composite(glow, layer_canvas)
         master_layer = Image.alpha_composite(master_layer, combined)
-
     return master_layer
 
 def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v, distance_offset, scale_val, opacity_val, canvas_size, fade_mult):
@@ -281,20 +264,16 @@ def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v
     new_w = max(1, int(proc_eff.width * scale_val))
     new_h = max(1, int(proc_eff.height * scale_val))
     resized_effect = proc_eff.resize((new_w, new_h), resample=Image.NEAREST)
-    
     final_opacity = max(0.0, min(1.0, opacity_val * fade_mult))
-    
     eff_np = np.array(resized_effect).copy()
     eff_np[:, :, 3] = (eff_np[:, :, 3] * final_opacity).astype(np.uint8)
     resized_effect = Image.fromarray(eff_np)
-        
+    
     total_angle = angle + eff_extra_rot
     rotated_eff = rotate_nearest_neighbor(resized_effect, total_angle)
-    
     rad = math.radians(-angle)
     off_x = int(distance_offset * math.cos(rad))
     off_y = int(distance_offset * math.sin(rad))
-    
     paste_x = canvas_center - (rotated_eff.width // 2) + off_x
     paste_y = canvas_center - (rotated_eff.height // 2) + off_y
     
@@ -305,22 +284,27 @@ def overlay_custom_effect_image(effect_img, angle, eff_extra_rot, flip_h, flip_v
 def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_angle, swing_arc_range, pivot_x, pivot_y, canvas_size, 
                             particle_layers, enable_dust,
                             custom_effect_img, eff_extra_rot, eff_flip_h, eff_flip_v, eff_offset, eff_scale, eff_opacity,
-                            fade_in_pct, fade_out_pct, weapon_radius, render_mode):
+                            fade_in_pct, fade_out_pct, weapon_radius, render_mode,
+                            trajectory_mode, linear_travel_dist):
     frame = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     canvas_center = canvas_size // 2
-
     fade_mult = calculate_fade_multiplier(frame_idx, total_frames, fade_in_pct, fade_out_pct)
 
-    half_range = swing_arc_range / 2.0
-    if w_type == "⚔️ Broadsword / Sword":
-        angle = np.linspace(half_range, -half_range, total_frames)[frame_idx] + base_rot_angle
-    elif w_type == "🌙 Scythe / Axe (360° Spin)":
-        angle = (frame_idx / float(total_frames)) * 360 + base_rot_angle
-    elif w_type == "🪀 Yoyo Spin":
-        angle = (frame_idx / float(total_frames)) * 180 + base_rot_angle
-    else:
-        angle = base_rot_angle
+    # Hitung Sudut / Posisi berdasarkan Trajectory Mode
+    if trajectory_mode == "🌀 Arc Swing (Rotasi Berputar)":
+        half_range = swing_arc_range / 2.0
+        if w_type == "⚔️ Broadsword / Sword":
+            angle = np.linspace(half_range, -half_range, total_frames)[frame_idx] + base_rot_angle
+        elif w_type == "🌙 Scythe / Axe (360° Spin)":
+            angle = (frame_idx / float(total_frames)) * 360 + base_rot_angle
+        elif w_type == "🪀 Yoyo Spin":
+            angle = (frame_idx / float(total_frames)) * 180 + base_rot_angle
+        else:
+            angle = base_rot_angle
+    else:  # Straight Line / Projectile Mode
+        angle = base_rot_angle  # Fix facing angle for projectile
 
+    # 1. Custom FX Image Layer
     if custom_effect_img is not None and render_mode in ["🌟 Full Weapon + FX", "✨ FX & Particles Only"]:
         eff_layer = overlay_custom_effect_image(
             custom_effect_img, angle, eff_extra_rot, eff_flip_h, eff_flip_v, 
@@ -328,43 +312,56 @@ def generate_weapon_frame(weapon_img, w_type, frame_idx, total_frames, base_rot_
         )
         frame = Image.alpha_composite(frame, eff_layer)
 
+    # 2. Particles Layer
     if enable_dust and w_type != "🔱 Spear / Polearm" and render_mode in ["🌟 Full Weapon + FX", "✨ FX & Particles Only"]:
         dust_layer = render_multi_particle_engine(
             canvas_size, weapon_radius, base_rot_angle, swing_arc_range, 
-            particle_layers, frame_idx, total_frames, fade_mult
+            particle_layers, frame_idx, total_frames, fade_mult,
+            trajectory_mode, linear_travel_dist
         )
         frame = Image.alpha_composite(frame, dust_layer)
 
+    # 3. Main Weapon / Projectile Layer
     if render_mode in ["🌟 Full Weapon + FX", "🗡️ Weapon Only"]:
-        if w_type == "🔱 Spear / Polearm":
-            thrust_dist = np.sin((frame_idx / float(max(1, total_frames - 1))) * math.pi) * (canvas_size * 0.25)
+        if trajectory_mode == "➡️ Straight Line / Projectile (Garis Lurus)":
+            # Linear travel translation
+            progress = frame_idx / float(max(1, total_frames - 1))
+            current_dist = progress * linear_travel_dist
+            rad = math.radians(-base_rot_angle)
+            off_x = int(current_dist * math.cos(rad))
+            off_y = int(current_dist * math.sin(rad))
+            
             rotated = rotate_nearest_neighbor(weapon_img, base_rot_angle)
-            offset_x = int(thrust_dist * math.cos(math.radians(base_rot_angle)))
-            offset_y = int(-thrust_dist * math.sin(math.radians(base_rot_angle)))
-            paste_x = canvas_center - (rotated.width // 2) + offset_x
-            paste_y = canvas_center - (rotated.height // 2) + offset_y
+            paste_x = canvas_center - (rotated.width // 2) + off_x
+            paste_y = canvas_center - (rotated.height // 2) + off_y
             frame.paste(rotated, (paste_x, paste_y), rotated)
         else:
-            rotated = rotate_nearest_neighbor(weapon_img, angle)
-            orig_cx, orig_cy = weapon_img.width / 2.0, weapon_img.height / 2.0
-            rad = math.radians(-angle)
-            cos_a, sin_a = math.cos(rad), math.sin(rad)
-            rx = (pivot_x - orig_cx) * cos_a - (pivot_y - orig_cy) * sin_a + (rotated.width / 2.0)
-            ry = (pivot_x - orig_cx) * sin_a + (pivot_y - orig_cy) * cos_a + (rotated.height / 2.0)
-            
-            paste_x, paste_y = int(canvas_center - rx), int(canvas_center - ry)
-            
-            if w_type == "🪀 Yoyo Spin":
-                draw = ImageDraw.Draw(frame)
-                draw.line([(0, canvas_size), (canvas_center, canvas_center)], fill=(220, 220, 220, 200), width=1)
+            if w_type == "🔱 Spear / Polearm":
+                thrust_dist = np.sin((frame_idx / float(max(1, total_frames - 1))) * math.pi) * (canvas_size * 0.25)
+                rotated = rotate_nearest_neighbor(weapon_img, base_rot_angle)
+                offset_x = int(thrust_dist * math.cos(math.radians(base_rot_angle)))
+                offset_y = int(-thrust_dist * math.sin(math.radians(base_rot_angle)))
+                paste_x = canvas_center - (rotated.width // 2) + offset_x
+                paste_y = canvas_center - (rotated.height // 2) + offset_y
+                frame.paste(rotated, (paste_x, paste_y), rotated)
+            else:
+                rotated = rotate_nearest_neighbor(weapon_img, angle)
+                orig_cx, orig_cy = weapon_img.width / 2.0, weapon_img.height / 2.0
+                rad = math.radians(-angle)
+                cos_a, sin_a = math.cos(rad), math.sin(rad)
+                rx = (pivot_x - orig_cx) * cos_a - (pivot_y - orig_cy) * sin_a + (rotated.width / 2.0)
+                ry = (pivot_x - orig_cx) * sin_a + (pivot_y - orig_cy) * cos_a + (rotated.height / 2.0)
                 
-            frame.paste(rotated, (paste_x, paste_y), rotated)
+                paste_x, paste_y = int(canvas_center - rx), int(canvas_center - ry)
+                if w_type == "🪀 Yoyo Spin":
+                    draw = ImageDraw.Draw(frame)
+                    draw.line([(0, canvas_size), (canvas_center, canvas_center)], fill=(220, 220, 220, 200), width=1)
+                frame.paste(rotated, (paste_x, paste_y), rotated)
 
     return frame
 
 def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padding_px):
     num_frames = len(frames)
-    
     if orientation == "Horizontal Grid (Kiri ke Kanan)":
         cols = grid_value
         rows = math.ceil(num_frames / cols)
@@ -380,7 +377,6 @@ def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padd
 
     total_w = (frame_size + padding_px) * cols + padding_px
     total_h = (frame_size + padding_px) * rows + padding_px
-    
     sheet = Image.new("RGBA", (total_w, total_h), (0, 0, 0, 0))
 
     for idx, frame in enumerate(frames):
@@ -396,7 +392,6 @@ def compile_custom_spritesheet(frames, frame_size, orientation, grid_value, padd
         else:
             r = idx
             c = 0
-            
         pos_x = padding_px + c * (frame_size + padding_px)
         pos_y = padding_px + r * (frame_size + padding_px)
         sheet.paste(frame, (pos_x, pos_y))
@@ -415,7 +410,7 @@ render_mode_choice = st.sidebar.radio(
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📁 2. Sprite Input")
-uploaded_file = st.sidebar.file_uploader("Upload File Senjata PNG:", type=["png"])
+uploaded_file = st.sidebar.file_uploader("Upload File Senjata / Projectile PNG:", type=["png"])
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ✨ 3. Custom Image FX (Opsional)")
@@ -444,11 +439,22 @@ if uploaded_file is not None:
     src_image = Image.open(uploaded_file).convert("RGBA")
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### ⚙️ 4. Tipe & Rotasi Senjata")
-    weapon_type = st.sidebar.selectbox("Kategori Senjata:", ["⚔️ Broadsword / Sword", "🔱 Spear / Polearm", "🌙 Scythe / Axe (360° Spin)", "🪀 Yoyo Spin"])
+    st.sidebar.markdown("### ⚙️ 4. Lintasan Gerak & Rotasi (Trajectory Mode)")
+    trajectory_mode = st.sidebar.radio(
+        "Pilih Jenis Lintasan Animasi:",
+        ["🌀 Arc Swing (Rotasi Berputar)", "➡️ Straight Line / Projectile (Garis Lurus)"]
+    )
+
+    weapon_type = st.sidebar.selectbox("Kategori Senjata/Proyektil:", ["⚔️ Broadsword / Sword", "🔱 Spear / Polearm", "🌙 Scythe / Axe (360° Spin)", "🪀 Yoyo Spin"])
     
-    base_angle_val = sync_control("base_angle", 45, -180, 180, 1, "Sudut Rotasi Base (°)")
-    swing_arc_range_val = sync_control("swing_arc_range", 130, 30, 240, 5, "Rentang Sudut Tebasan (°)")
+    base_angle_val = sync_control("base_angle", 45, -180, 180, 1, "Sudut Arah Hadap / Rotasi (°)")
+    
+    if trajectory_mode == "🌀 Arc Swing (Rotasi Berputar)":
+        swing_arc_range_val = sync_control("swing_arc_range", 130, 30, 240, 5, "Rentang Sudut Tebasan (°)")
+        linear_travel_dist = 0
+    else:
+        swing_arc_range_val = 0
+        linear_travel_dist = sync_control("linear_travel_dist", 100, 10, 400, 10, "Jarak Tempuh Garis Lurus (Px)")
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 📈 5. Smooth Fade In & Fade Out Engine")
@@ -495,10 +501,8 @@ if uploaded_file is not None:
     ]
 
     particle_layers_config = []
-
     for l_idx in range(num_particle_layers):
         st.sidebar.markdown(f"#### 🎨 Layer Partikel #{l_idx + 1}")
-        
         p_style = st.sidebar.selectbox(f"Model Partikel L{l_idx + 1}:", particle_options, key=f"p_style_{l_idx}")
         
         c_img = None
@@ -510,7 +514,6 @@ if uploaded_file is not None:
             c_scale = st.sidebar.slider(f"Skala Partikel Custom L{l_idx + 1}:", 0.1, 2.0, 0.5, 0.05, key=f"p_scale_{l_idx}")
 
         p_cnt = sync_control(f"p_cnt_{l_idx}", 20 if l_idx == 0 else 15, 5, 80, 1, f"Kepadatan L{l_idx + 1}")
-        
         default_colors = ["#00FFFF", "#FF4500", "#FFD700"]
         p_clr = st.sidebar.color_picker(f"Warna Tint L{l_idx + 1}:", default_colors[l_idx % 3], key=f"p_clr_{l_idx}")
 
@@ -541,14 +544,12 @@ if uploaded_file is not None:
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🎬 10. Export & Preview Settings")
     
-    safe_canvas_size = max(128, int((weapon_radius * 2) + 60))
+    safe_canvas_size = max(128, int((weapon_radius * 2) + linear_travel_dist + 60))
     safe_canvas_size = min(1024, safe_canvas_size)
     
     sheet_frames_count = sync_control("sheet_frames", 6, 3, 16, 1, "Jumlah Frame Animasi")
-    
     st.sidebar.caption(f"*(Saran Anti-Crop: Auto-Canvas = {safe_canvas_size}px)*")
     frame_canvas_size = sync_control("frame_canvas_size", safe_canvas_size, 64, 1024, 8, "Resolusi Canvas (Px)")
-    
     anim_fps = sync_control("anim_fps", 10, 5, 30, 1, "Frame Rate Preview (FPS)")
 
     # ==========================================
@@ -582,7 +583,7 @@ if uploaded_file is not None:
             particle_layers_config, enable_dust,
             custom_eff_img, eff_rot_extra, eff_flip_h, eff_flip_v, eff_dist_offset, eff_scale_val, eff_opacity_val,
             fade_in_pct_val, fade_out_pct_val, weapon_radius,
-            render_mode_choice
+            render_mode_choice, trajectory_mode, linear_travel_dist
         )
         for idx in range(sheet_frames_count)
     ]
@@ -602,13 +603,13 @@ if uploaded_file is not None:
         )
         gif_bytes = gif_bytes_io.getvalue()
         
-        st.image(gif_bytes, caption=f"Loop Preview ({num_particle_layers} Layers Particle - {render_mode_choice})", use_container_width=True)
-        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name=f"Terraria_Swing_{render_mode_choice}.gif", mime="image/gif", use_container_width=True)
+        st.image(gif_bytes, caption=f"Loop Preview ({trajectory_mode})", use_container_width=True)
+        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name=f"Terraria_Projectile_{render_mode_choice}.gif", mime="image/gif", use_container_width=True)
 
     # C# CODE SNIPPET SECTION
     st.markdown("---")
     st.markdown("### 💻 4. TModLoader C# Code Generator")
-    item_style = "ItemUseStyleID.Swing" if "Sword" in weapon_type or "Scythe" in weapon_type else ("ItemUseStyleID.Thrust" if "Spear" in weapon_type else "ItemUseStyleID.Shoot")
+    item_style = "ItemUseStyleID.Shoot" if trajectory_mode == "➡️ Straight Line / Projectile (Garis Lurus)" else ("ItemUseStyleID.Swing" if "Sword" in weapon_type or "Scythe" in weapon_type else "ItemUseStyleID.Thrust")
     dust_id_map = {
         "📁 Custom PNG Particle": "DustID.Electric",
         "✨ Magic Sparkles": "DustID.Electric", "🔥 Fire Embers": "DustID.Torch", "❄️ Ice Crystals": "DustID.IceTorch",
@@ -621,7 +622,6 @@ if uploaded_file is not None:
         "⚡ Void Lightning": "DustID.ShadowbeamStaff", "🌧️ Snow Flakes": "DustID.Snow", "💥 Arcane Orbs": "DustID.Nebula",
         "💖 Heart Particles": "DustID.Heart"
     }
-    
     primary_p_style = particle_layers_config[0]["style"]
     dust_type_str = dust_id_map.get(primary_p_style, "DustID.Electric")
     
@@ -632,7 +632,7 @@ using Terraria.ModLoader;
 
 namespace YourModName.Items
 {{
-    public class CustomWeapon : ModItem
+    public class CustomProjectileItem : ModItem
     {{
         public override void SetDefaults()
         {{
@@ -641,53 +641,19 @@ namespace YourModName.Items
             Item.useStyle = {item_style};
             Item.useAnimation = 20;
             Item.useTime = 20;
-            Item.damage = 50;
-            Item.knockBack = 6f;
-            Item.UseSound = SoundID.Item1;
+            Item.damage = 40;
+            Item.knockBack = 4f;
+            Item.shoot = ProjectileID.WoodenArrowFriendly;
+            Item.shootSpeed = 12f;
+            Item.UseSound = SoundID.Item5;
             Item.autoReuse = true;
             Item.value = Item.buyPrice(gold: 1);
             Item.rare = ItemRarityID.Green;
         }}
-
-        // Terraria Melee Dust Trail Effect ({primary_p_style})
-        public override void MeleeEffects(Player player, Rectangle hitbox)
-        {{
-            if (Main.rand.NextBool(2))
-            {{
-                int dust = Dust.NewDust(
-                    new Vector2(hitbox.X, hitbox.Y), 
-                    hitbox.Width, 
-                    hitbox.Height, 
-                    {dust_type_str}, 
-                    player.velocity.X * 0.2f, 
-                    player.velocity.Y * 0.2f, 
-                    100, 
-                    default(Color), 
-                    1.2f
-                );
-                Main.dust[dust].noGravity = true;
-            }}
-        }}
     }}
 }}"""
     st.code(csharp_code, language="csharp")
-    st.download_button("💾 Download Script C# (.cs)", data=csharp_code, file_name="CustomWeapon.cs", mime="text/plain", use_container_width=False)
-
-    # GLOWMASK SECTION
-    glow_base = None
-    if enable_glowmask:
-        st.markdown("---")
-        st.markdown("### 🪄 Glowmask Texture (`Item_Glow.png`)")
-        col_g1, col_g2 = st.columns([1, 1])
-        glow_img = generate_glowmask(src_image, threshold=glow_threshold)
-        glow_base = rotate_nearest_neighbor(glow_img, base_angle_val)
-        
-        with col_g1:
-            st.image(glow_base, caption="Glowmask Only (Tekstur Menyala)", use_container_width=True)
-        with col_g2:
-            buf_glow = io.BytesIO()
-            glow_base.save(buf_glow, format="PNG")
-            st.download_button("💾 Download Glowmask PNG", data=buf_glow.getvalue(), file_name="Terraria_Item_Glow.png", mime="image/png", use_container_width=True)
+    st.download_button("💾 Download Script C# (.cs)", data=csharp_code, file_name="CustomProjectileItem.cs", mime="text/plain", use_container_width=False)
 
     # SPRITE SHEET SECTION
     st.markdown("---")
@@ -709,7 +675,7 @@ namespace YourModName.Items
     st.download_button(
         f"💾 Download Sprite Sheet PNG ({'FX ONLY' if 'FX' in render_mode_choice else 'FULL'})", 
         data=buf_sheet.getvalue(), 
-        file_name="Terraria_Weapon_SwingSheet_FXOnly.png" if "FX" in render_mode_choice else "Terraria_Weapon_SwingSheet.png", 
+        file_name="Terraria_Projectile_SwingSheet.png", 
         mime="image/png", 
         use_container_width=True
     )
@@ -720,14 +686,12 @@ namespace YourModName.Items
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        zip_file.writestr("CustomWeapon.png", buf_rot.getvalue())
-        if glow_base:
-            zip_file.writestr("CustomWeapon_Glow.png", buf_glow.getvalue())
-        zip_file.writestr("CustomWeapon_SwingSheet.png", buf_sheet.getvalue())
-        zip_file.writestr("CustomWeapon_Animation.gif", gif_bytes)
-        zip_file.writestr("CustomWeapon.cs", csharp_code)
+        zip_file.writestr("CustomItem.png", buf_rot.getvalue())
+        zip_file.writestr("CustomItem_Sheet.png", buf_sheet.getvalue())
+        zip_file.writestr("CustomItem_Animation.gif", gif_bytes)
+        zip_file.writestr("CustomProjectileItem.cs", csharp_code)
 
-    st.download_button("📦 Download Complete Mod Package (.ZIP)", data=zip_buffer.getvalue(), file_name="Terraria_Mod_Weapon_Package.zip", mime="application/zip", use_container_width=True)
+    st.download_button("📦 Download Complete Mod Package (.ZIP)", data=zip_buffer.getvalue(), file_name="Terraria_Mod_Projectile_Package.zip", mime="application/zip", use_container_width=True)
 
 else:
-    st.info("👈 Silakan unggah file gambar PNG senjata milikmu di menu sebelah kiri untuk memulai studio!")
+    st.info("👈 Silakan unggah file gambar PNG senjata atau proyektil milikmu di menu sebelah kiri untuk memulai studio!")
