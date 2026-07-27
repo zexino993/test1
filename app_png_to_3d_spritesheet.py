@@ -1,13 +1,14 @@
 import streamlit as st
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageFilter
 import numpy as np
 import io
 import math
 import zipfile
+import random
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="PNG to 3D Sprite Sheet Studio Pro v2.2",
+    page_title="PNG to 3D Sprite Sheet Extreme v2.3",
     page_icon="🧊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -22,7 +23,7 @@ st.markdown("""
         font-family: 'Inter', system-ui, sans-serif;
     }
     .studio-header {
-        background: linear-gradient(90deg, rgba(56, 189, 248, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%);
+        background: linear-gradient(90deg, rgba(56, 189, 248, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%);
         border: 1px solid rgba(125, 211, 252, 0.2);
         backdrop-filter: blur(12px);
         padding: 24px;
@@ -33,7 +34,7 @@ st.markdown("""
     .studio-title {
         font-size: 2.2rem;
         font-weight: 800;
-        background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
+        background: linear-gradient(90deg, #38bdf8, #ec4899, #f59e0b);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin: 0;
@@ -44,12 +45,12 @@ st.markdown("""
         margin-top: 6px;
     }
     .stButton > button, .stDownloadButton > button {
-        background: linear-gradient(135deg, #0ea5e9 0%, #8b5cf6 100%) !important;
+        background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%) !important;
         color: #ffffff !important;
         border-radius: 10px !important;
         font-weight: 700 !important;
         padding: 10px 20px !important;
-        box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4) !important;
+        box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4) !important;
     }
     .stButton > button:hover, .stDownloadButton > button:hover {
         transform: translateY(-2px) scale(1.02) !important;
@@ -65,13 +66,13 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🧊 PNG to 3D Sprite Sheet Studio Pro v2.2</div>
-    <div class="studio-subtitle">Multi-Style 3D Rendering Engine: Voxel Solid, Smooth Billboard, Isometric Box, Curved Dome, & Parallax Wave!</div>
+    <div class="studio-title">🧊 PNG to 3D Sprite Studio Extreme v2.3</div>
+    <div class="studio-subtitle">10 Gaya Rendering 3D Gila! Hologram, Jelly Bounce, Tornado Swirl, dan Parallax Wave!</div>
 </div>
 """, unsafe_allow_html=True)
 
-# 4. ADVANCED MULTI-STYLE 3D ENGINE
-def generate_advanced_3d_frame(img, angle_y, depth_thickness, scale_factor, canvas_size, mode):
+# 4. EXTREME MULTI-STYLE 3D ENGINE
+def generate_extreme_3d_frame(img, angle_y, depth_thickness, scale_factor, canvas_size, mode, progress_ratio):
     w, h = img.size
     new_w = max(1, int(w * scale_factor))
     new_h = max(1, int(h * scale_factor))
@@ -115,10 +116,8 @@ def generate_advanced_3d_frame(img, angle_y, depth_thickness, scale_factor, canv
         canvas.paste(final_w_img, (paste_x, paste_y), final_w_img)
 
     elif mode == "🧊 Isometric Box Projection (Kotak 3D Isometrik)":
-        # Simulasi kotak isometrik dengan efek muka bersudut
         steps = max(2, depth_thickness)
         for z in range(steps, -1, -1):
-            # Pergerakan miring isometrik
             shift_x = int(z * math.cos(rad_y) * 0.7)
             shift_y = int(z * math.sin(rad_y) * 0.7)
             
@@ -132,10 +131,8 @@ def generate_advanced_3d_frame(img, angle_y, depth_thickness, scale_factor, canv
             canvas.paste(layer_img, (paste_x, paste_y), layer_img)
 
     elif mode == "🌟 Curved Dome / Coin Spin (Koin / Permata Cembung)":
-        # Efek cembung di bagian tengah seperti koin atau permata berputar
         steps = max(2, depth_thickness)
         for z in range(steps, -1, -1):
-            # Distorsi cembung menggunakan fungsi kosinus
             expansion = math.cos((z / steps) * (math.pi / 2)) * (depth_thickness * 0.8)
             current_scale = 1.0 + (expansion / max(1, base_img.width)) * math.cos(rad_y)
             
@@ -154,7 +151,7 @@ def generate_advanced_3d_frame(img, angle_y, depth_thickness, scale_factor, canv
             paste_y = center - (shaded_layer.height // 2)
             canvas.paste(shaded_layer, (paste_x, paste_y), shaded_layer)
 
-    else: # Mode "🌊 Floating Wave / Parallax Depth (Melayang Berlapis)"
+    elif mode == "🌊 Floating Wave / Parallax Depth (Melayang Berlapis)":
         steps = 5
         for z in range(steps):
             wave_offset = int(math.sin(rad_y + (z * 0.5)) * (depth_thickness * 1.5))
@@ -167,6 +164,90 @@ def generate_advanced_3d_frame(img, angle_y, depth_thickness, scale_factor, canv
             paste_x = center - (layer_img.width // 2) + wave_offset + (z * 2)
             paste_y = center - (layer_img.height // 2) - (z * 3)
             canvas.paste(layer_img, (paste_x, paste_y), layer_img)
+
+    elif mode == "⚡ Hologram Glitch (Transparan & Putus-putus)":
+        np_layer = np.array(base_img).astype(np.float32)
+        # Warna hologram biru/cyan dengan transparansi 60%
+        np_layer[:, :, 0] *= 0.2  # Kurangi Red
+        np_layer[:, :, 1] *= 1.2  # Tambah Green
+        np_layer[:, :, 2] *= 1.5  # Tambah Blue
+        np_layer[:, :, 3] *= 0.6  # Kurangi Alpha
+        
+        # Bikin garis putus-putus ala Glitch TV rusak
+        for y in range(0, np_layer.shape[0], 4):
+            np_layer[y:y+2, :, 3] *= 0.2 
+            
+        # Putar sedikit
+        holo_img = Image.fromarray(np.clip(np_layer, 0, 255).astype(np.uint8))
+        glitch_x = int(math.sin(rad_y * 3) * 5)
+        
+        paste_x = center - (holo_img.width // 2) + glitch_x
+        paste_y = center - (holo_img.height // 2)
+        canvas.paste(holo_img, (paste_x, paste_y), holo_img)
+
+    elif mode == "🍮 Jelly Bounce Spin (Mumbul Kenyal)":
+        # Bouncing physics dengan sine wave
+        bounce_h = int(abs(math.sin(rad_y * 2)) * depth_thickness)
+        squish_w = 1.0 + (abs(math.cos(rad_y * 2)) * 0.3)
+        squish_h = 1.0 - (abs(math.cos(rad_y * 2)) * 0.3)
+        
+        jelly_w = max(4, int(base_img.width * squish_w))
+        jelly_h = max(4, int(base_img.height * squish_h))
+        jelly_img = base_img.resize((jelly_w, jelly_h), resample=Image.NEAREST)
+        
+        paste_x = center - (jelly_img.width // 2)
+        paste_y = center - (jelly_img.height // 2) + bounce_h - (depth_thickness // 2)
+        canvas.paste(jelly_img, (paste_x, paste_y), jelly_img)
+
+    elif mode == "🌪️ Tornado Swirl (Melintir ke Atas)":
+        steps = max(2, depth_thickness)
+        for z in range(steps):
+            # Rotasi spiral ke atas
+            spiral_x = int(math.cos(rad_y + z*0.4) * (z * 2))
+            spiral_y = -int(z * 4)
+            
+            scale = max(0.2, 1.0 - (z * 0.05))
+            sw = max(2, int(base_img.width * scale))
+            sh = max(2, int(base_img.height * scale))
+            
+            swirl_img = base_img.resize((sw, sh), resample=Image.NEAREST)
+            
+            np_layer = np.array(swirl_img).astype(np.float32)
+            np_layer[:, :, 3] *= max(0.1, 1.0 - (z / steps))
+            swirl_img = Image.fromarray(np_layer.astype(np.uint8))
+            
+            paste_x = center - (swirl_img.width // 2) + spiral_x
+            paste_y = center - (swirl_img.height // 2) + spiral_y + (depth_thickness * 2)
+            canvas.paste(swirl_img, (paste_x, paste_y), swirl_img)
+
+    elif mode == "🚀 Speed Dash (Motion Blur / After-Image)":
+        # 3 Bayangan hantu di belakang objek utama
+        for ghost in range(3, 0, -1):
+            offset_x = int(math.cos(rad_y) * (ghost * depth_thickness))
+            
+            np_layer = np.array(base_img).astype(np.float32)
+            np_layer[:, :, 3] *= (0.2 / ghost) # Sangat transparan
+            ghost_img = Image.fromarray(np_layer.astype(np.uint8))
+            
+            paste_x = center - (ghost_img.width // 2) - offset_x
+            paste_y = center - (ghost_img.height // 2)
+            canvas.paste(ghost_img, (paste_x, paste_y), ghost_img)
+            
+        # Objek Utama
+        canvas.paste(base_img, (center - base_img.width//2, center - base_img.height//2), base_img)
+
+    elif mode == "❤️ Heartbeat Pulse (Berdetak 3D)":
+        # Membesar dan mengecil seperti jantung berdetak
+        pulse = 1.0 + (abs(math.sin(rad_y)) * (depth_thickness * 0.05))
+        
+        pulse_w = max(4, int(base_img.width * pulse))
+        pulse_h = max(4, int(base_img.height * pulse))
+        pulse_img = base_img.resize((pulse_w, pulse_h), resample=Image.NEAREST)
+        
+        # Tambahkan sedikit glow merah
+        glow = pulse_img.filter(ImageFilter.GaussianBlur(radius=3))
+        canvas.paste(glow, (center - glow.width//2, center - glow.height//2), glow)
+        canvas.paste(pulse_img, (center - pulse_img.width//2, center - pulse_img.height//2), pulse_img)
 
     return canvas
 
@@ -208,7 +289,7 @@ if uploaded_file is not None:
     src_img = Image.open(uploaded_file).convert("RGBA")
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🧊 2. Pilih Gaya 3D Profesional")
+    st.sidebar.markdown("### 🧊 2. Pilih Gaya 3D Ekstrem!")
     mode_3d = st.sidebar.selectbox(
         "Gaya Rendering 3D:",
         [
@@ -216,16 +297,21 @@ if uploaded_file is not None:
             "🔄 Smooth Billboard Spin (Putar 360° Mulus)",
             "🧊 Isometric Box Projection (Kotak 3D Isometrik)",
             "🌟 Curved Dome / Coin Spin (Koin / Permata Cembung)",
-            "🌊 Floating Wave / Parallax Depth (Melayang Berlapis)"
+            "🌊 Floating Wave / Parallax Depth (Melayang Berlapis)",
+            "⚡ Hologram Glitch (Transparan & Putus-putus)",
+            "🍮 Jelly Bounce Spin (Mumbul Kenyal)",
+            "🌪️ Tornado Swirl (Melintir ke Atas)",
+            "🚀 Speed Dash (Motion Blur / After-Image)",
+            "❤️ Heartbeat Pulse (Berdetak 3D)"
         ]
     )
     
-    depth_thickness = st.sidebar.slider("Intensitas / Ketebalan Efek 3D:", 1, 30, 10, 1)
+    depth_thickness = st.sidebar.slider("Intensitas / Ketebalan / Jarak Efek:", 1, 30, 10, 1)
     scale_factor = st.sidebar.slider("Skala Ukuran Objek:", 0.5, 3.0, 1.5, 0.1)
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🎬 3. Pengaturan Animasi Sprite Sheet")
-    total_frames = st.sidebar.slider("Jumlah Frame Animasi (360°):", 4, 36, 12, 2)
+    total_frames = st.sidebar.slider("Jumlah Frame Animasi (360° / Loop):", 4, 36, 12, 2)
     anim_fps = st.sidebar.slider("Preview Kecepatan (FPS):", 2, 30, 8, 1)
 
     st.sidebar.markdown("---")
@@ -246,14 +332,15 @@ if uploaded_file is not None:
         st.image(src_img, use_container_width=True)
 
     # Hitung ukuran canvas aman
-    canvas_res = max(128, int(max(src_img.width, src_img.height) * scale_factor * 2.2))
+    canvas_res = max(128, int(max(src_img.width, src_img.height) * scale_factor * 2.5))
     canvas_res = min(512, canvas_res)
 
-    # Generate semua frame rotasi 360 derajat penuh
+    # Generate semua frame
     frames_3d = []
     for i in range(total_frames):
         angle_y = (i / float(total_frames)) * 360.0
-        frame = generate_advanced_3d_frame(src_img, angle_y, depth_thickness, scale_factor, canvas_res, mode_3d)
+        progress_ratio = i / float(total_frames)
+        frame = generate_extreme_3d_frame(src_img, angle_y, depth_thickness, scale_factor, canvas_res, mode_3d, progress_ratio)
         frames_3d.append(frame)
 
     with col_prev2:
@@ -265,7 +352,7 @@ if uploaded_file is not None:
         )
         gif_bytes = gif_io.getvalue()
         st.image(gif_bytes, use_container_width=True)
-        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name="sprite_3d_advanced_animation.gif", mime="image/gif", use_container_width=True)
+        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name="sprite_3d_extreme_animation.gif", mime="image/gif", use_container_width=True)
 
     st.markdown("---")
     st.markdown(f"### 🖼️ 5. Hasil Sprite Sheet ({sheet_layout_option})")
@@ -280,7 +367,7 @@ if uploaded_file is not None:
     st.download_button(
         "💾 Download Sprite Sheet 3D (.png)", 
         data=sheet_bytes, 
-        file_name="sprite_sheet_3d_advanced.png", 
+        file_name="sprite_sheet_3d_extreme.png", 
         mime="image/png", 
         use_container_width=True
     )
@@ -298,10 +385,10 @@ if uploaded_file is not None:
     st.download_button(
         "📦 Download Full Package (.zip berisi Sprite Sheet + GIF + Individual Frames)", 
         data=zip_io.getvalue(), 
-        file_name="3D_SpriteSheet_Advanced_Package.zip", 
+        file_name="3D_SpriteSheet_Extreme_Package.zip", 
         mime="application/zip", 
         use_container_width=True
     )
 
 else:
-    st.info("👈 Silakan unggah gambar PNG transparan di panel kiri untuk mulai mengubahnya menjadi 3D Sprite Sheet dengan pilihan gaya rendering lengkap!")
+    st.info("👈 Silakan unggah gambar PNG transparan di panel kiri untuk mulai bereksperimen dengan 10 Gaya 3D Gila!")
