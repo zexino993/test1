@@ -7,7 +7,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="PNG to 3D Sprite Sheet Studio Pro v2",
+    page_title="PNG to 3D Sprite Sheet Studio Pro v2.1",
     page_icon="🧊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -65,18 +65,13 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🧊 PNG to 3D Sprite Sheet Studio Pro v2</div>
-    <div class="studio-subtitle">Perbaikan Algoritma 3D: Rotasi Billboard Mulus, Tanpa Efek Gepeng, & Ketebalan Voxel Solid!</div>
+    <div class="studio-title">🧊 PNG to 3D Sprite Sheet Studio Pro v2.1</div>
+    <div class="studio-subtitle">Dilengkapi Pengaturan Layout Sprite Sheet Khusus: Horizontal Only (1 Baris) atau Vertical Only (1 Kolom)!</div>
 </div>
 """, unsafe_allow_html=True)
 
-# 4. ENGINE 3D PRO (FIXED ROTATION & EXTRUSION)
+# 4. ENGINE 3D PRO
 def generate_3d_pro_frame(img, angle_y, depth_thickness, scale_factor, canvas_size, mode):
-    """
-    Menghasilkan frame 3D dengan 2 pilihan mode berkualitas tinggi:
-    1. Voxel Extrusion (Memberikan ketebalan nyata ke belakang tanpa gepeng berlebih).
-    2. Isometric/Billboard Spin (Rotasi melingkar mulus ala game klasik 2.5D).
-    """
     w, h = img.size
     new_w = max(1, int(w * scale_factor))
     new_h = max(1, int(h * scale_factor))
@@ -88,14 +83,11 @@ def generate_3d_pro_frame(img, angle_y, depth_thickness, scale_factor, canvas_si
     rad_y = math.radians(angle_y)
     
     if mode == "🧱 Voxel Extrusion (Tebal & Berisi)":
-        # Render tumpukan layer ke belakang untuk menciptakan efek ketebalan 3D
         steps = max(1, depth_thickness)
         for z in range(steps, -1, -1):
-            # Pergeseran posisi berdasarkan sudut putar Y
             shift_x = int(z * math.sin(rad_y) * 0.8)
-            shift_y = int(z * 0.3) # Efek sedikit miring ke bawah (isometric view)
+            shift_y = int(z * 0.3)
             
-            # Berikan bayangan gelap pada layer bagian dalam/belakang
             if z > 0:
                 np_layer = np.array(base_img).astype(np.float32)
                 shade = max(0.4, 1.0 - (z / steps) * 0.4)
@@ -108,20 +100,12 @@ def generate_3d_pro_frame(img, angle_y, depth_thickness, scale_factor, canvas_si
             paste_y = center - (layer_img.height // 2) - shift_y
             canvas.paste(layer_img, (paste_x, paste_y), layer_img)
 
-    else: # Mode "🔄 Smooth Billboard Spin (Putar 360°)"
-        # Menggunakan transformasi rotasi affine / perputaran titik pusat tanpa gepeng aneh
-        # Kita putar gambar asli dengan sudut Y, dan berikan sedikit efek lengkung 3D
-        rotated_img = base_img.rotate(0, resample=Image.NEAREST, expand=True)
-        
-        # Efek pergerakan melingkar (orbiting)
+    else: 
         radius_orbit = depth_thickness * 1.5
         orbit_x = int(math.cos(rad_y) * radius_orbit)
-        
-        # Lebar menyesuaikan cosinus agar tampak berputar menjauh/mendekat secara natural
         scale_w = max(0.2, abs(math.cos(rad_y)))
         scaled_w = max(4, int(base_img.width * scale_w))
         
-        # Jika menghadap samping, balik gambar (flipping) untuk efek sisi sebaliknya
         curr_img = base_img
         if math.sin(rad_y) < 0:
             curr_img = ImageOps.mirror(base_img)
@@ -134,16 +118,32 @@ def generate_3d_pro_frame(img, angle_y, depth_thickness, scale_factor, canvas_si
 
     return canvas
 
-def compile_spritesheet(frames, frame_size, cols=4):
+def compile_spritesheet(frames, frame_size, layout_mode, grid_cols=4):
     num_frames = len(frames)
-    rows = math.ceil(num_frames / cols)
+    
+    if layout_mode == "Horizontal Only (1 Baris Saja)":
+        cols = num_frames
+        rows = 1
+    elif layout_mode == "Vertical Only (1 Kolom Saja)":
+        cols = 1
+        rows = num_frames
+    else: # Grid Custom
+        cols = grid_cols
+        rows = math.ceil(num_frames / cols)
+        
     sheet_w = frame_size * cols
     sheet_h = frame_size * rows
     
     sheet = Image.new("RGBA", (sheet_w, sheet_h), (0, 0, 0, 0))
     for idx, frame in enumerate(frames):
-        r = idx // cols
-        c = idx % cols
+        if layout_mode == "Horizontal Only (1 Baris Saja)":
+            r, c = 0, idx
+        elif layout_mode == "Vertical Only (1 Kolom Saja)":
+            r, c = idx, 0
+        else:
+            r = idx // cols
+            c = idx % cols
+            
         sheet.paste(frame, (c * frame_size, r * frame_size))
         
     return sheet, cols, rows
@@ -169,7 +169,17 @@ if uploaded_file is not None:
     st.sidebar.markdown("### 🎬 3. Pengaturan Animasi Sprite Sheet")
     total_frames = st.sidebar.slider("Jumlah Frame Putaran (360°):", 4, 36, 12, 2)
     anim_fps = st.sidebar.slider("Preview Kecepatan (FPS):", 2, 30, 8, 1)
-    grid_cols = st.sidebar.slider("Jumlah Kolom Sprite Sheet:", 2, 8, 4, 1)
+
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📐 4. Layout Sprite Sheet")
+    sheet_layout_option = st.sidebar.selectbox(
+        "Pilih Orientasi Layout:",
+        ["Horizontal Only (1 Baris Saja)", "Vertical Only (1 Kolom Saja)", "Grid Custom (Multi Kolom/Baris)"]
+    )
+    
+    grid_cols = 4
+    if sheet_layout_option == "Grid Custom (Multi Kolom/Baris)":
+        grid_cols = st.sidebar.slider("Jumlah Kolom Grid:", 2, 8, 4, 1)
 
     # Preview gambar asli
     col_prev1, col_prev2 = st.columns([1, 2])
@@ -177,7 +187,7 @@ if uploaded_file is not None:
         st.markdown("##### Gambar Asli (2D)")
         st.image(src_img, use_container_width=True)
 
-    # Hitung ukuran canvas aman agar tidak terpotong
+    # Hitung ukuran canvas aman
     canvas_res = max(128, int(max(src_img.width, src_img.height) * scale_factor * 2.0))
     canvas_res = min(512, canvas_res)
 
@@ -200,10 +210,10 @@ if uploaded_file is not None:
         st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name="sprite_3d_pro_animation.gif", mime="image/gif", use_container_width=True)
 
     st.markdown("---")
-    st.markdown("### 🖼️ 4. Hasil Sprite Sheet 3D Pro")
+    st.markdown(f"### 🖼️ 5. Hasil Sprite Sheet ({sheet_layout_option})")
     
-    sprite_sheet, f_cols, f_rows = compile_spritesheet(frames_3d, canvas_res, cols=grid_cols)
-    st.image(sprite_sheet, caption=f"Sprite Sheet Grid ({f_cols} Kolom x {f_rows} Baris - Resolusi: {sprite_sheet.width}x{sprite_sheet.height} px)", use_container_width=False)
+    sprite_sheet, f_cols, f_rows = compile_spritesheet(frames_3d, canvas_res, sheet_layout_option, grid_cols)
+    st.image(sprite_sheet, caption=f"Sprite Sheet Layout ({f_cols} Kolom x {f_rows} Baris - Resolusi: {sprite_sheet.width}x{sprite_sheet.height} px)", use_container_width=False)
 
     sheet_io = io.BytesIO()
     sprite_sheet.save(sheet_io, format="PNG")
@@ -212,7 +222,7 @@ if uploaded_file is not None:
     st.download_button(
         "💾 Download Sprite Sheet 3D (.png)", 
         data=sheet_bytes, 
-        file_name="sprite_sheet_3d_pro.png", 
+        file_name="sprite_sheet_3d_oriented.png", 
         mime="image/png", 
         use_container_width=True
     )
@@ -220,7 +230,7 @@ if uploaded_file is not None:
     # Paket ZIP Exporter
     zip_io = io.BytesIO()
     with zipfile.ZipFile(zip_io, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("sprite_sheet_3d_pro.png", sheet_bytes)
+        zf.writestr("sprite_sheet_3d.png", sheet_bytes)
         zf.writestr("animation.gif", gif_bytes)
         for idx, f in enumerate(frames_3d):
             f_io = io.BytesIO()
@@ -230,10 +240,10 @@ if uploaded_file is not None:
     st.download_button(
         "📦 Download Full Package (.zip berisi Sprite Sheet + GIF + Individual Frames)", 
         data=zip_io.getvalue(), 
-        file_name="3D_SpriteSheet_Pro_Package.zip", 
+        file_name="3D_SpriteSheet_Oriented_Package.zip", 
         mime="application/zip", 
         use_container_width=True
     )
 
 else:
-    st.info("👈 Silakan unggah gambar PNG transparan di panel kiri untuk mulai mengubahnya menjadi 3D Sprite Sheet dengan kualitas tinggi!")
+    st.info("👈 Silakan unggah gambar PNG transparan di panel kiri untuk mulai mengubahnya menjadi 3D Sprite Sheet!")
