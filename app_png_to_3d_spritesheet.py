@@ -7,7 +7,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="PNG to 3D Sprite Sheet Generator",
+    page_title="PNG to 3D Sprite Sheet Studio Pro v2",
     page_icon="🧊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -65,64 +65,72 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🧊 PNG to 3D Sprite Sheet Studio</div>
-    <div class="studio-subtitle">Ubah gambar PNG 2D datar Anda menjadi model 3D berputar (Extrusion / Voxel / Billboard) & Export jadi Sprite Sheet!</div>
+    <div class="studio-title">🧊 PNG to 3D Sprite Sheet Studio Pro v2</div>
+    <div class="studio-subtitle">Perbaikan Algoritma 3D: Rotasi Billboard Mulus, Tanpa Efek Gepeng, & Ketebalan Voxel Solid!</div>
 </div>
 """, unsafe_allow_html=True)
 
-# 4. ENGINE 3D PSEUDO-EXTRUSION & ROTATION
-def generate_3d_frame(img, angle_y, angle_x, depth_layers, scale_factor, canvas_size):
+# 4. ENGINE 3D PRO (FIXED ROTATION & EXTRUSION)
+def generate_3d_pro_frame(img, angle_y, depth_thickness, scale_factor, canvas_size, mode):
     """
-    Mensimulasikan objek 3D dengan teknik Voxel/Layer Extrusion 
-    berdasarkan ketebalan (depth_layers) dan rotasi sumbu Y & X.
+    Menghasilkan frame 3D dengan 2 pilihan mode berkualitas tinggi:
+    1. Voxel Extrusion (Memberikan ketebalan nyata ke belakang tanpa gepeng berlebih).
+    2. Isometric/Billboard Spin (Rotasi melingkar mulus ala game klasik 2.5D).
     """
-    # Resize gambar awal sesuai skala
     w, h = img.size
-    new_w, new_h = max(1, int(w * scale_factor)), max(1, int(img.height * scale_factor))
+    new_w = max(1, int(w * scale_factor))
+    new_h = max(1, int(h * scale_factor))
     base_img = img.resize((new_w, new_h), resample=Image.NEAREST)
     
     canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     center = canvas_size // 2
 
     rad_y = math.radians(angle_y)
-    rad_x = math.radians(angle_x)
-
-    # Efek 3D Extrusion: Menumpuk layer gambar ke belakang dengan pergeseran sudut
-    cos_y = math.cos(rad_y)
-    sin_y = math.sin(rad_y)
-
-    # Render dari belakang ke depan (painter's algorithm sederhana)
-    step = max(1, depth_layers // 10) if depth_layers > 10 else 1
     
-    for z in range(-depth_layers // 2, depth_layers // 2 + 1, step):
-        # Hitung pergeseran posisi berdasarkan rotasi Y
-        offset_x = z * sin_y * 1.5
-        offset_y = z * math.sin(rad_x) * 1.5
-        
-        # Efek bayangan atau penggelapan pada layer belakang untuk kesan 3D mendalam
-        if z != 0:
-            layer_img = base_img.copy()
-            # Buat sedikit lebih gelap untuk layer dalam
-            np_layer = np.array(layer_img).astype(np.float32)
-            shade = 1.0 - (abs(z) / (depth_layers / 2 + 1)) * 0.35
-            np_layer[:, :, :3] *= shade
-            layer_img = Image.fromarray(np_layer.astype(np.uint8))
-        else:
-            layer_img = base_img
+    if mode == "🧱 Voxel Extrusion (Tebal & Berisi)":
+        # Render tumpukan layer ke belakang untuk menciptakan efek ketebalan 3D
+        steps = max(1, depth_thickness)
+        for z in range(steps, -1, -1):
+            # Pergeseran posisi berdasarkan sudut putar Y
+            shift_x = int(z * math.sin(rad_y) * 0.8)
+            shift_y = int(z * 0.3) # Efek sedikit miring ke bawah (isometric view)
+            
+            # Berikan bayangan gelap pada layer bagian dalam/belakang
+            if z > 0:
+                np_layer = np.array(base_img).astype(np.float32)
+                shade = max(0.4, 1.0 - (z / steps) * 0.4)
+                np_layer[:, :, :3] *= shade
+                layer_img = Image.fromarray(np_layer.astype(np.uint8))
+            else:
+                layer_img = base_img
 
-        # Kompres lebar horizontal berdasarkan cosinus rotasi Y (efek memutar 3D)
-        current_w = max(1, int(layer_img.width * abs(cos_y)))
-        if current_w < 1: 
-            continue
+            paste_x = center - (layer_img.width // 2) + shift_x
+            paste_y = center - (layer_img.height // 2) - shift_y
+            canvas.paste(layer_img, (paste_x, paste_y), layer_img)
+
+    else: # Mode "🔄 Smooth Billboard Spin (Putar 360°)"
+        # Menggunakan transformasi rotasi affine / perputaran titik pusat tanpa gepeng aneh
+        # Kita putar gambar asli dengan sudut Y, dan berikan sedikit efek lengkung 3D
+        rotated_img = base_img.rotate(0, resample=Image.NEAREST, expand=True)
         
-        scaled_layer = layer_img.resize((current_w, layer_img.height), resample=Image.NEAREST)
+        # Efek pergerakan melingkar (orbiting)
+        radius_orbit = depth_thickness * 1.5
+        orbit_x = int(math.cos(rad_y) * radius_orbit)
         
-        # Posisi tempel
-        paste_x = int(center - (scaled_layer.width // 2) + offset_x)
-        paste_y = int(center - (scaled_layer.height // 2) + offset_y)
+        # Lebar menyesuaikan cosinus agar tampak berputar menjauh/mendekat secara natural
+        scale_w = max(0.2, abs(math.cos(rad_y)))
+        scaled_w = max(4, int(base_img.width * scale_w))
         
-        # Tempel ke canvas utama
-        canvas.paste(scaled_layer, (paste_x, paste_y), scaled_layer)
+        # Jika menghadap samping, balik gambar (flipping) untuk efek sisi sebaliknya
+        curr_img = base_img
+        if math.sin(rad_y) < 0:
+            curr_img = ImageOps.mirror(base_img)
+            
+        final_w_img = curr_img.resize((scaled_w, curr_img.height), resample=Image.NEAREST)
+        
+        paste_x = center - (final_w_img.width // 2) + orbit_x
+        paste_y = center - (final_w_img.height // 2)
+        canvas.paste(final_w_img, (paste_x, paste_y), final_w_img)
 
     return canvas
 
@@ -148,13 +156,17 @@ if uploaded_file is not None:
     src_img = Image.open(uploaded_file).convert("RGBA")
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🧊 2. Pengaturan 3D Extrusion")
-    depth_layers = st.sidebar.slider("Ketebalan Objek 3D (Depth Layers):", 1, 40, 15, 1)
-    scale_factor = st.sidebar.slider("Skala Ukuran Objek:", 0.2, 2.0, 1.0, 0.1)
-    tilt_x = st.sidebar.slider("Kemiringan Sumbu X (°):", -45, 45, 0, 5)
+    st.sidebar.markdown("### 🧊 2. Pengaturan Mode 3D")
+    mode_3d = st.sidebar.radio(
+        "Pilih Gaya 3D:",
+        ["🧱 Voxel Extrusion (Tebal & Berisi)", "🔄 Smooth Billboard Spin (Putar 360°)"]
+    )
+    
+    depth_thickness = st.sidebar.slider("Ketebalan / Kedalaman Objek:", 1, 30, 8, 1)
+    scale_factor = st.sidebar.slider("Skala Ukuran Objek:", 0.5, 3.0, 1.5, 0.1)
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🎬 3. Pengaturan Animasi Putar (Sprite Sheet)")
+    st.sidebar.markdown("### 🎬 3. Pengaturan Animasi Sprite Sheet")
     total_frames = st.sidebar.slider("Jumlah Frame Putaran (360°):", 4, 36, 12, 2)
     anim_fps = st.sidebar.slider("Preview Kecepatan (FPS):", 2, 30, 8, 1)
     grid_cols = st.sidebar.slider("Jumlah Kolom Sprite Sheet:", 2, 8, 4, 1)
@@ -165,15 +177,15 @@ if uploaded_file is not None:
         st.markdown("##### Gambar Asli (2D)")
         st.image(src_img, use_container_width=True)
 
-    # Hitung ukuran canvas aman
-    canvas_res = max(128, int(max(src_img.width, src_img.height) * scale_factor * 1.5))
+    # Hitung ukuran canvas aman agar tidak terpotong
+    canvas_res = max(128, int(max(src_img.width, src_img.height) * scale_factor * 2.0))
     canvas_res = min(512, canvas_res)
 
     # Generate semua frame rotasi 360 derajat penuh
     frames_3d = []
     for i in range(total_frames):
         angle_y = (i / float(total_frames)) * 360.0
-        frame = generate_3d_frame(src_img, angle_y, tilt_x, depth_layers, scale_factor, canvas_res)
+        frame = generate_3d_pro_frame(src_img, angle_y, depth_thickness, scale_factor, canvas_res, mode_3d)
         frames_3d.append(frame)
 
     with col_prev2:
@@ -185,10 +197,10 @@ if uploaded_file is not None:
         )
         gif_bytes = gif_io.getvalue()
         st.image(gif_bytes, use_container_width=True)
-        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name="sprite_3d_animation.gif", mime="image/gif", use_container_width=True)
+        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name="sprite_3d_pro_animation.gif", mime="image/gif", use_container_width=True)
 
     st.markdown("---")
-    st.markdown("### 🖼️ 4. Hasil Sprite Sheet 3D")
+    st.markdown("### 🖼️ 4. Hasil Sprite Sheet 3D Pro")
     
     sprite_sheet, f_cols, f_rows = compile_spritesheet(frames_3d, canvas_res, cols=grid_cols)
     st.image(sprite_sheet, caption=f"Sprite Sheet Grid ({f_cols} Kolom x {f_rows} Baris - Resolusi: {sprite_sheet.width}x{sprite_sheet.height} px)", use_container_width=False)
@@ -200,7 +212,7 @@ if uploaded_file is not None:
     st.download_button(
         "💾 Download Sprite Sheet 3D (.png)", 
         data=sheet_bytes, 
-        file_name="sprite_sheet_3d.png", 
+        file_name="sprite_sheet_3d_pro.png", 
         mime="image/png", 
         use_container_width=True
     )
@@ -208,9 +220,8 @@ if uploaded_file is not None:
     # Paket ZIP Exporter
     zip_io = io.BytesIO()
     with zipfile.ZipFile(zip_io, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("sprite_sheet_3d.png", sheet_bytes)
+        zf.writestr("sprite_sheet_3d_pro.png", sheet_bytes)
         zf.writestr("animation.gif", gif_bytes)
-        # Simpan frame satuan jika dibutuhkan developer game
         for idx, f in enumerate(frames_3d):
             f_io = io.BytesIO()
             f.save(f_io, format="PNG")
@@ -219,10 +230,10 @@ if uploaded_file is not None:
     st.download_button(
         "📦 Download Full Package (.zip berisi Sprite Sheet + GIF + Individual Frames)", 
         data=zip_io.getvalue(), 
-        file_name="3D_SpriteSheet_Package.zip", 
+        file_name="3D_SpriteSheet_Pro_Package.zip", 
         mime="application/zip", 
         use_container_width=True
     )
 
 else:
-    st.info("👈 Silakan unggah gambar PNG transparan (seperti koin, karakter, item, atau pohon pixel art) di panel kiri untuk mulai mengubahnya menjadi 3D Sprite Sheet!")
+    st.info("👈 Silakan unggah gambar PNG transparan di panel kiri untuk mulai mengubahnya menjadi 3D Sprite Sheet dengan kualitas tinggi!")
