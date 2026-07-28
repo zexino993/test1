@@ -7,7 +7,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Modular Sprite Studio v2.7 with Resets",
+    page_title="Modular Sprite Studio v2.8 with 2D/3D Mode",
     page_icon="🔄",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -16,6 +16,7 @@ st.set_page_config(
 # 2. SESSION STATE DEFAULTS INITIALIZER
 default_states = {
     "use_rotation_y": True,
+    "rotation_mode": "2D 360° Rotasi Datar (Flat Spin)",
     "rot_dir": "➡️ Searah Jarum Jam (Clockwise)",
     "start_angle": 0,
     "total_sweep": 360,
@@ -37,9 +38,9 @@ for key, val in default_states.items():
     if key not in st.session_state:
         st.session_state[key] = val
 
-# Callback reset per section
 def reset_rotation():
     st.session_state.use_rotation_y = default_states["use_rotation_y"]
+    st.session_state.rotation_mode = default_states["rotation_mode"]
     st.session_state.rot_dir = default_states["rot_dir"]
     st.session_state.start_angle = default_states["start_angle"]
     st.session_state.total_sweep = default_states["total_sweep"]
@@ -116,15 +117,15 @@ st.markdown("""
 # 4. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🔄 Modular Sprite Studio v2.7</div>
-    <div class="studio-subtitle">Dilengkapi Tombol Reset Khusus di Setiap Fitur untuk Kontrol Parameter yang Fleksibel!</div>
+    <div class="studio-title">🔄 Modular Sprite Studio v2.8</div>
+    <div class="studio-subtitle">Pilihan Mode Rotasi: 2D Flat Spin vs 3D Spatial Rotation & Tombol Reset Modular Lengkap!</div>
 </div>
 """, unsafe_allow_html=True)
 
-# 5. RENDER ENGINE
-def render_true_axis_frame(img, angle_y_deg, tilt_x_deg, tilt_z_deg, scale_factor, canvas_size, 
-                           use_rotation_y, use_voxel_depth, voxel_thickness, 
-                           use_axis_tilts, use_bounce, use_glow):
+# 5. RENDER ENGINE DENGAN PILIHAN 2D / 3D ROTATION MODE
+def render_frame(img, angle_deg, tilt_x_deg, tilt_z_deg, scale_factor, canvas_size, 
+                 use_rotation_y, rot_mode, use_voxel_depth, voxel_thickness, 
+                 use_axis_tilts, use_bounce, use_glow):
     w, h = img.size
     new_w = max(1, int(w * scale_factor))
     new_h = max(1, int(h * scale_factor))
@@ -136,18 +137,23 @@ def render_true_axis_frame(img, angle_y_deg, tilt_x_deg, tilt_z_deg, scale_facto
     working_img = base_img
 
     if use_rotation_y:
-        rad_y = math.radians(angle_y_deg)
-        scale_w = max(0.1, abs(math.cos(rad_y)))
-        scaled_w = max(4, int(base_img.width * scale_w))
-        
-        curr_img = base_img
-        if math.sin(rad_y) < 0:
-            curr_img = ImageOps.mirror(base_img)
+        if "2D" in rot_mode:
+            # Mode 2D: Murni memutar gambar datar pada poros tengah (2D rotation)
+            working_img = base_img.rotate(angle_deg, resample=Image.NEAREST, expand=True)
+        else:
+            # Mode 3D: Efek putar spasial (menyusut menyamping membentuk volume 3D)
+            rad_y = math.radians(angle_deg)
+            scale_w = max(0.1, abs(math.cos(rad_y)))
+            scaled_w = max(4, int(base_img.width * scale_w))
             
-        working_img = curr_img.resize((scaled_w, curr_img.height), resample=Image.NEAREST)
+            curr_img = base_img
+            if math.sin(rad_y) < 0:
+                curr_img = ImageOps.mirror(base_img)
+                
+            working_img = curr_img.resize((scaled_w, curr_img.height), resample=Image.NEAREST)
 
-    if use_voxel_depth and voxel_thickness > 0:
-        rad_y = math.radians(angle_y_deg)
+    if use_voxel_depth and voxel_thickness > 0 and "3D" in rot_mode:
+        rad_y = math.radians(angle_deg)
         steps = max(1, voxel_thickness)
         voxel_canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
         
@@ -182,7 +188,7 @@ def render_true_axis_frame(img, angle_y_deg, tilt_x_deg, tilt_z_deg, scale_facto
 
     bounce_offset = 0
     if use_bounce:
-        bounce_offset = int(abs(math.sin(math.radians(angle_y_deg * 2))) * 8)
+        bounce_offset = int(abs(math.sin(math.radians(angle_deg * 2))) * 8)
 
     paste_x = center - (working_img.width // 2)
     paste_y = center - (working_img.height // 2) - bounce_offset
@@ -218,17 +224,22 @@ uploaded_file = st.sidebar.file_uploader("Pilih file PNG transparan:", type=["pn
 if uploaded_file is not None:
     src_img = Image.open(uploaded_file).convert("RGBA")
     
-    # --- FITUR 1: ROTASI Y ---
+    # --- FITUR 1: ROTASI (2D / 3D MODE) ---
     st.sidebar.markdown("---")
     col_h1, col_r1 = st.sidebar.columns([3, 1])
-    col_h1.markdown("### 🔄 Rotasi Sumbu Y")
+    col_h1.markdown("### 🔄 Mode & Rotasi")
     col_r1.button("Reset", key="btn_reset_rot", on_click=reset_rotation)
     
-    st.session_state.use_rotation_y = st.sidebar.checkbox("Aktifkan Rotasi Y (360°)", value=st.session_state.use_rotation_y)
+    st.session_state.use_rotation_y = st.sidebar.checkbox("Aktifkan Animasi Putar", value=st.session_state.use_rotation_y)
     if st.session_state.use_rotation_y:
+        st.session_state.rotation_mode = st.sidebar.radio(
+            "Pilih Mode Rotasi:",
+            ["2D 360° Rotasi Datar (Flat Spin)", "3D 360° Rotasi Spasial (Volume Spin)"],
+            key="rot_mode_val"
+        )
         st.session_state.rot_dir = st.sidebar.radio("Arah Putaran:", ["➡️ Searah Jarum Jam (Clockwise)", "⬅️ Berlawanan Jarum Jam (Counter-Clockwise)"], key="rot_dir_val")
-        st.session_state.start_angle = st.sidebar.slider("Sudut Awal Y (°):", 0, 360, st.session_state.start_angle, 15)
-        st.session_state.total_sweep = st.sidebar.slider("Total Rentang Putaran Y (°):", 90, 360, st.session_state.total_sweep, 45)
+        st.session_state.start_angle = st.sidebar.slider("Sudut Awal (°):", 0, 360, st.session_state.start_angle, 15)
+        st.session_state.total_sweep = st.sidebar.slider("Total Rentang Putaran (°):", 90, 360, st.session_state.total_sweep, 45)
 
     st.session_state.total_frames = st.sidebar.slider("Jumlah Frame Animasi:", 4, 36, st.session_state.total_frames, 2)
     st.session_state.anim_fps = st.sidebar.slider("Preview Kecepatan (FPS):", 2, 30, st.session_state.anim_fps, 1)
@@ -239,7 +250,7 @@ if uploaded_file is not None:
     col_h2.markdown("### 🧱 Voxel Depth")
     col_r2.button("Reset", key="btn_reset_voxel", on_click=reset_voxel)
     
-    st.session_state.use_voxel_depth = st.sidebar.checkbox("Aktifkan Ketebalan Voxel", value=st.session_state.use_voxel_depth)
+    st.session_state.use_voxel_depth = st.sidebar.checkbox("Aktifkan Ketebalan Voxel (Hanya Mode 3D)", value=st.session_state.use_voxel_depth)
     if st.session_state.use_voxel_depth:
         st.session_state.voxel_thickness = st.sidebar.slider("Ketebalan Voxel:", 1, 30, st.session_state.voxel_thickness, 1)
 
@@ -290,12 +301,13 @@ if uploaded_file is not None:
 
     for i in range(st.session_state.total_frames):
         progress = i / float(max(1, st.session_state.total_frames - 1)) if st.session_state.total_frames > 1 else 0
-        current_angle_y = st.session_state.start_angle + (progress * st.session_state.total_sweep * dir_multiplier)
+        current_angle = st.session_state.start_angle + (progress * st.session_state.total_sweep * dir_multiplier)
         
-        frame = render_true_axis_frame(
-            src_img, current_angle_y, st.session_state.tilt_x_deg, st.session_state.tilt_z_deg, 
+        frame = render_frame(
+            src_img, current_angle, st.session_state.tilt_x_deg, st.session_state.tilt_z_deg, 
             st.session_state.scale_factor, canvas_res,
-            st.session_state.use_rotation_y, st.session_state.use_voxel_depth, st.session_state.voxel_thickness,
+            st.session_state.use_rotation_y, st.session_state.rotation_mode, 
+            st.session_state.use_voxel_depth, st.session_state.voxel_thickness,
             st.session_state.use_axis_tilts, st.session_state.use_bounce, st.session_state.use_glow
         )
         frames_3d.append(frame)
@@ -309,7 +321,7 @@ if uploaded_file is not None:
         )
         gif_bytes = gif_io.getvalue()
         st.image(gif_bytes, use_container_width=True)
-        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name="sprite_modular_animation.gif", mime="image/gif", use_container_width=True)
+        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name="sprite_animation.gif", mime="image/gif", use_container_width=True)
 
     st.markdown("---")
     st.markdown(f"### 🖼️ Hasil Sprite Sheet ({st.session_state.sheet_layout_option})")
@@ -324,7 +336,7 @@ if uploaded_file is not None:
     st.download_button(
         "💾 Download Sprite Sheet (.png)", 
         data=sheet_bytes, 
-        file_name="sprite_sheet_modular.png", 
+        file_name="sprite_sheet.png", 
         mime="image/png", 
         use_container_width=True
     )
@@ -342,10 +354,10 @@ if uploaded_file is not None:
     st.download_button(
         "📦 Download Full Package (.zip)", 
         data=zip_io.getvalue(), 
-        file_name="Modular_SpriteSheet_Package.zip", 
+        file_name="SpriteSheet_Package.zip", 
         mime="application/zip", 
         use_container_width=True
     )
 
 else:
-    st.info("👈 Silakan unggah file PNG transparan di panel kiri untuk mulai menggunakan fitur dengan tombol reset modular!")
+    st.info("👈 Silakan unggah file PNG transparan di panel kiri untuk mulai menggunakan Studio Sprite Modular!")
