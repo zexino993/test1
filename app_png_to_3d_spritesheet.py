@@ -7,8 +7,8 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Modular Sprite Studio v2.5",
-    page_icon="🎛️",
+    page_title="True Axis Sprite Studio v2.6",
+    page_icon="📐",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -22,7 +22,7 @@ st.markdown("""
         font-family: 'Inter', system-ui, sans-serif;
     }
     .studio-header {
-        background: linear-gradient(90deg, rgba(14, 165, 233, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%);
+        background: linear-gradient(90deg, rgba(14, 165, 233, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%);
         border: 1px solid rgba(125, 211, 252, 0.2);
         backdrop-filter: blur(12px);
         padding: 24px;
@@ -33,7 +33,7 @@ st.markdown("""
     .studio-title {
         font-size: 2.2rem;
         font-weight: 800;
-        background: linear-gradient(90deg, #38bdf8, #c084fc, #ec4899);
+        background: linear-gradient(90deg, #38bdf8, #c084fc, #f43f5e);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin: 0;
@@ -44,7 +44,7 @@ st.markdown("""
         margin-top: 6px;
     }
     .stButton > button, .stDownloadButton > button {
-        background: linear-gradient(135deg, #0ea5e9 0%, #ec4899 100%) !important;
+        background: linear-gradient(135deg, #0ea5e9 0%, #a855f7 100%) !important;
         color: #ffffff !important;
         border-radius: 10px !important;
         font-weight: 700 !important;
@@ -65,16 +65,15 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🎛️ Modular Sprite Studio v2.5</div>
-    <div class="studio-subtitle">Pilih Fitur yang Ingin Diaktifkan Secara Bebas: Pure 2D 360° Rotation, 3D Voxel Extrusion, Tilt, & FX!</div>
+    <div class="studio-title">📐 True Axis Sprite Studio v2.6</div>
+    <div class="studio-subtitle">Perbaikan Total: Sudut Kemiringan Sumbu X (Pitch), Y (Yaw/Spin), dan Z (Roll) Berfungsi Sempurna!</div>
 </div>
 """, unsafe_allow_html=True)
 
-# 4. MODULAR RENDER ENGINE
-def render_modular_frame(img, current_angle_deg, scale_factor, canvas_size, 
-                           use_pure_2d_rot, use_voxel_depth, voxel_thickness, 
-                           use_tilt, tilt_x, tilt_z, 
-                           use_bounce, use_glow):
+# 4. TRUE AXIS TRANSFORM ENGINE
+def render_true_axis_frame(img, angle_y_deg, tilt_x_deg, tilt_z_deg, scale_factor, canvas_size, 
+                           use_rotation_y, use_voxel_depth, voxel_thickness, 
+                           use_axis_tilts, use_bounce, use_glow):
     w, h = img.size
     new_w = max(1, int(w * scale_factor))
     new_h = max(1, int(h * scale_factor))
@@ -83,19 +82,27 @@ def render_modular_frame(img, current_angle_deg, scale_factor, canvas_size,
     canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     center = canvas_size // 2
     
-    # 1. FITUR PURE 2D 360° ROTATION (Murni berputar tanpa gepeng aneh)
-    if use_pure_2d_rot:
-        # Menggunakan rotasi PIL terpusat dengan expand=False agar ukuran konsisten di tengah
-        working_img = base_img.rotate(current_angle_deg, resample=Image.NEAREST, expand=False)
-    else:
-        working_img = base_img
+    working_img = base_img
 
-    # 2. FITUR 3D VOXEL EXTRUSION DEPTH (Menambah ketebalan ke belakang)
-    if use_voxel_depth and voxel_thickness > 0:
-        rad_y = math.radians(current_angle_deg)
-        steps = max(1, voxel_thickness)
+    # 1. ROTASI SUMBU Y (Yaw / Spin 360 Derajat Murni)
+    if use_rotation_y:
+        rad_y = math.radians(angle_y_deg)
+        # Efek lebar menyusut secara natural sesuai sudut kosinus putaran Y
+        scale_w = max(0.1, abs(math.cos(rad_y)))
+        scaled_w = max(4, int(base_img.width * scale_w))
         
+        curr_img = base_img
+        if math.sin(rad_y) < 0:
+            curr_img = ImageOps.mirror(base_img)
+            
+        working_img = curr_img.resize((scaled_w, curr_img.height), resample=Image.NEAREST)
+
+    # 2. 3D VOXEL EXTRUSION (Ketebalan Objek)
+    if use_voxel_depth and voxel_thickness > 0:
+        rad_y = math.radians(angle_y_deg)
+        steps = max(1, voxel_thickness)
         voxel_canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+        
         for z in range(steps, -1, -1):
             shift_x = int(z * math.sin(rad_y) * 0.8)
             shift_y = int(z * 0.2)
@@ -113,20 +120,28 @@ def render_modular_frame(img, current_angle_deg, scale_factor, canvas_size,
             voxel_canvas.paste(layer_img, (p_x, p_y), layer_img)
         working_img = voxel_canvas
 
-    # 3. FITUR PERSPECTIVE TILT (Kemiringan Sudut Pandang X & Z)
-    if use_tilt and (tilt_x != 0 or tilt_z != 0):
-        working_img = working_img.rotate(tilt_z, resample=Image.NEAREST, expand=True)
+    # 3. KEMIRINGAN SUMBU X DAN Z (True Axis Tilt X & Z)
+    if use_axis_tilts and (tilt_x_deg != 0 or tilt_z_deg != 0):
+        # Sumbu Z (Roll) - Putar biasa
+        if tilt_z_deg != 0:
+            working_img = working_img.rotate(tilt_z_deg, resample=Image.NEAREST, expand=True)
+            
+        # Sumbu X (Pitch) - Simulasi kemiringan vertikal dengan mengubah tinggi (scaling vertikal berdasarkan cosinus tilt_x)
+        if tilt_x_deg != 0:
+            rad_x = math.radians(tilt_x_deg)
+            new_height = max(4, int(working_img.height * max(0.2, abs(math.cos(rad_x)))))
+            working_img = working_img.resize((working_img.width, new_height), resample=Image.NEAREST)
 
-    # 4. FITUR SPECIAL FX (Glow & Bounce)
+    # 4. SPECIAL FX (Glow & Bounce)
     if use_glow:
         glow_layer = working_img.filter(ImageFilter.GaussianBlur(radius=4))
         canvas.paste(glow_layer, (center - glow_layer.width//2, center - glow_layer.height//2), glow_layer)
 
     bounce_offset = 0
     if use_bounce:
-        bounce_offset = int(abs(math.sin(math.radians(current_angle_deg * 2))) * 8)
+        bounce_offset = int(abs(math.sin(math.radians(angle_y_deg * 2))) * 8)
 
-    # Tempel akhir ke canvas utama
+    # Tempel ke canvas tengah
     paste_x = center - (working_img.width // 2)
     paste_y = center - (working_img.height // 2) - bounce_offset
     canvas.paste(working_img, (paste_x, paste_y), working_img)
@@ -173,23 +188,22 @@ if uploaded_file is not None:
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🎛️ 2. Panel Pilihan Fitur (Modular Toggles)")
     
-    # Checkbox utama untuk mengaktifkan/menonaktifkan fitur secara spesifik
-    use_pure_2d_rot = st.sidebar.checkbox("🔄 Aktifkan Pure 2D 360° Rotation", value=True)
-    use_voxel_depth = st.sidebar.checkbox("🧱 Aktifkan 3D Voxel Extrusion (Ketebalan)", value=False)
-    use_tilt        = st.sidebar.checkbox("📐 Aktifkan Sudut Kamera (Tilt X/Z)", value=False)
+    use_rotation_y  = st.sidebar.checkbox("🔄 Aktifkan Rotasi Sumbu Y (Spin 360°)", value=True)
+    use_voxel_depth = st.sidebar.checkbox("🧱 Aktifkan Ketebalan 3D Voxel", value=False)
+    use_axis_tilts  = st.sidebar.checkbox("📐 Aktifkan Kemiringan Sumbu X & Z", value=True)
     use_bounce      = st.sidebar.checkbox("🍮 Aktifkan Efek Jelly Bounce", value=False)
     use_glow        = st.sidebar.checkbox("✨ Aktifkan Efek Glow / Pendaran", value=False)
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### ⚙️ 3. Pengaturan Parameter Fitur")
+    st.sidebar.markdown("### ⚙️ 3. Pengaturan Sudut & Parameter")
     
-    if use_pure_2d_rot:
+    if use_rotation_y:
         rotation_direction = st.sidebar.radio(
-            "Arah Putaran 2D:",
+            "Arah Putaran Y:",
             ["➡️ Searah Jarum Jam (Clockwise)", "⬅️ Berlawanan Jarum Jam (Counter-Clockwise)"]
         )
-        start_angle = st.sidebar.slider("Sudut Awal (°):", 0, 360, 0, 15)
-        total_sweep = st.sidebar.slider("Total Rentang Putaran (°):", 90, 360, 360, 45)
+        start_angle = st.sidebar.slider("Sudut Awal Y (°):", 0, 360, 0, 15)
+        total_sweep = st.sidebar.slider("Total Rentang Putaran Y (°):", 90, 360, 360, 45)
     else:
         rotation_direction = "➡️ Searah Jarum Jam (Clockwise)"
         start_angle, total_sweep = 0, 360
@@ -198,15 +212,16 @@ if uploaded_file is not None:
     anim_fps = st.sidebar.slider("Preview Kecepatan (FPS):", 2, 30, 8, 1)
 
     if use_voxel_depth:
-        voxel_thickness = st.sidebar.slider("Ketebalan Voxel (Depth Layers):", 1, 30, 8, 1)
+        voxel_thickness = st.sidebar.slider("Ketebalan Voxel:", 1, 30, 8, 1)
     else:
         voxel_thickness = 0
 
-    if use_tilt:
-        tilt_x = st.sidebar.slider("Kemiringan Vertikal (X):", -90, 90, 0, 5)
-        tilt_z = st.sidebar.slider("Kemiringan Rotasi (Z):", -180, 180, 0, 5)
+    if use_axis_tilts:
+        st.sidebar.markdown("**Kontrol Kemiringan Sumbu Kamera:**")
+        tilt_x_deg = st.sidebar.slider("Sudut Kemiringan X (Pitch / Atas-Bawah):", -90, 90, 0, 5)
+        tilt_z_deg = st.sidebar.slider("Sudut Kemiringan Z (Roll / Miring Samping):", -180, 180, 0, 5)
     else:
-        tilt_x, tilt_z = 0, 0
+        tilt_x_deg, tilt_z_deg = 0, 0
 
     scale_factor = st.sidebar.slider("Skala Ukuran Objek:", 0.5, 3.0, 1.2, 0.1)
 
@@ -228,7 +243,7 @@ if uploaded_file is not None:
         st.image(src_img, use_container_width=True)
 
     # Ukuran canvas aman
-    canvas_res = max(128, int(max(src_img.width, src_img.height) * scale_factor * 2.2))
+    canvas_res = max(128, int(max(src_img.width, src_img.height) * scale_factor * 2.5))
     canvas_res = min(512, canvas_res)
 
     # Kalkulasi frame render
@@ -237,12 +252,12 @@ if uploaded_file is not None:
 
     for i in range(total_frames):
         progress = i / float(max(1, total_frames - 1)) if total_frames > 1 else 0
-        current_angle = start_angle + (progress * total_sweep * dir_multiplier)
+        current_angle_y = start_angle + (progress * total_sweep * dir_multiplier)
         
-        frame = render_modular_frame(
-            src_img, current_angle, scale_factor, canvas_res,
-            use_pure_2d_rot, use_voxel_depth, voxel_thickness,
-            use_tilt, tilt_x, tilt_z, use_bounce, use_glow
+        frame = render_true_axis_frame(
+            src_img, current_angle_y, tilt_x_deg, tilt_z_deg, scale_factor, canvas_res,
+            use_rotation_y, use_voxel_depth, voxel_thickness,
+            use_axis_tilts, use_bounce, use_glow
         )
         frames_3d.append(frame)
 
@@ -255,7 +270,7 @@ if uploaded_file is not None:
         )
         gif_bytes = gif_io.getvalue()
         st.image(gif_bytes, use_container_width=True)
-        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name="sprite_modular_animation.gif", mime="image/gif", use_container_width=True)
+        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name="sprite_axis_animation.gif", mime="image/gif", use_container_width=True)
 
     st.markdown("---")
     st.markdown(f"### 🖼️ 5. Hasil Sprite Sheet ({sheet_layout_option})")
@@ -270,7 +285,7 @@ if uploaded_file is not None:
     st.download_button(
         "💾 Download Sprite Sheet (.png)", 
         data=sheet_bytes, 
-        file_name="sprite_sheet_modular.png", 
+        file_name="sprite_sheet_axis.png", 
         mime="image/png", 
         use_container_width=True
     )
@@ -288,10 +303,10 @@ if uploaded_file is not None:
     st.download_button(
         "📦 Download Full Package (.zip)", 
         data=zip_io.getvalue(), 
-        file_name="Modular_SpriteSheet_Package.zip", 
+        file_name="Axis_SpriteSheet_Package.zip", 
         mime="application/zip", 
         use_container_width=True
     )
 
 else:
-    st.info("👈 Silakan unggah file PNG transparan di panel kiri untuk mulai memilih fitur yang ingin diaktifkan!")
+    st.info("👈 Silakan unggah file PNG transparan di panel kiri untuk mulai mengatur kemiringan sumbu X, Y, dan Z!")
