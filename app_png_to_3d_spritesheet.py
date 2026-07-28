@@ -7,7 +7,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Modular Sprite Studio v2.9 (2D + XYZ Axis)",
+    page_title="Modular Sprite Studio v2.9.1 (Fixed)",
     page_icon="🔄",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -119,8 +119,8 @@ st.markdown("""
 # 4. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🔄 Modular Sprite Studio v2.9</div>
-    <div class="studio-subtitle">Rotasi 2D Datar dengan Kontrol Penuh Kemiringan Sumbu X, Y, dan Z yang Fleksibel!</div>
+    <div class="studio-title">🔄 Modular Sprite Studio v2.9.1</div>
+    <div class="studio-subtitle">Perbaikan Bug Sprite Sheet Kosong, Rotasi 2D, & Kontrol Sumbu XYZ Penuh!</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -138,13 +138,10 @@ def render_frame(img, angle_deg, tilt_x_deg, tilt_y_deg, tilt_z_deg, scale_facto
     
     working_img = base_img
 
-    # 1. ROTASI UTAMA (2D Datar atau 3D Spasial)
     if use_rotation_y:
         if "2D" in rot_mode:
-            # Rotasi 2D murni (Roll di sumbu Z)
             working_img = base_img.rotate(angle_deg, resample=Image.NEAREST, expand=True)
         else:
-            # Rotasi 3D Spatial
             rad_y = math.radians(angle_deg)
             scale_w = max(0.1, abs(math.cos(rad_y)))
             scaled_w = max(4, int(base_img.width * scale_w))
@@ -155,7 +152,6 @@ def render_frame(img, angle_deg, tilt_x_deg, tilt_y_deg, tilt_z_deg, scale_facto
                 
             working_img = curr_img.resize((scaled_w, curr_img.height), resample=Image.NEAREST)
 
-    # 2. VOXEL DEPTH (Hanya aktif jika mode 3D)
     if use_voxel_depth and voxel_thickness > 0 and "3D" in rot_mode:
         rad_y = math.radians(angle_deg)
         steps = max(1, voxel_thickness)
@@ -178,19 +174,13 @@ def render_frame(img, angle_deg, tilt_x_deg, tilt_y_deg, tilt_z_deg, scale_facto
             voxel_canvas.paste(layer_img, (p_x, p_y), layer_img)
         working_img = voxel_canvas
 
-    # 3. KEMIRINGAN SUMBU X, Y, DAN Z (Bisa dimainkan bebas kapan saja)
     if use_axis_tilts and (tilt_x_deg != 0 or tilt_y_deg != 0 or tilt_z_deg != 0):
-        # Sumbu Z (Roll / Kemiringan Samping)
         if tilt_z_deg != 0:
             working_img = working_img.rotate(tilt_z_deg, resample=Image.NEAREST, expand=True)
-            
-        # Sumbu X (Pitch / Kemiringan Atas-Bawah) lewat skala vertikal
         if tilt_x_deg != 0:
             rad_x = math.radians(tilt_x_deg)
             new_height = max(4, int(working_img.height * max(0.1, abs(math.cos(rad_x)))))
             working_img = working_img.resize((working_img.width, new_height), resample=Image.NEAREST)
-            
-        # Sumbu Y (Yaw / Kemiringan Samping Tambahan) lewat skala horizontal
         if tilt_y_deg != 0:
             rad_y_tilt = math.radians(tilt_y_deg)
             new_width = max(4, int(working_img.width * max(0.1, abs(math.cos(rad_y_tilt)))))
@@ -210,8 +200,15 @@ def render_frame(img, angle_deg, tilt_x_deg, tilt_y_deg, tilt_z_deg, scale_facto
 
     return canvas
 
-def compile_spritesheet(frames, frame_size, layout_mode, grid_cols=4):
+def compile_spritesheet(frames, layout_mode, grid_cols=4):
     num_frames = len(frames)
+    if num_frames == 0:
+        return Image.new("RGBA", (64, 64), (0,0,0,0)), 1, 1
+        
+    # Ambil ukuran maksimum dari frame agar seragam dan aman
+    max_w = max(f.width for f in frames)
+    max_h = max(f.height for f in frames)
+    
     if layout_mode == "Horizontal Only (1 Baris Saja)":
         cols, rows = num_frames, 1
     elif layout_mode == "Vertical Only (1 Kolom Saja)":
@@ -220,7 +217,7 @@ def compile_spritesheet(frames, frame_size, layout_mode, grid_cols=4):
         cols = grid_cols
         rows = math.ceil(num_frames / cols)
         
-    sheet = Image.new("RGBA", (frame_size * cols, frame_size * rows), (0, 0, 0, 0))
+    sheet = Image.new("RGBA", (max_w * cols, max_h * rows), (0, 0, 0, 0))
     for idx, frame in enumerate(frames):
         if layout_mode == "Horizontal Only (1 Baris Saja)":
             r, c = 0, idx
@@ -228,7 +225,12 @@ def compile_spritesheet(frames, frame_size, layout_mode, grid_cols=4):
             r, c = idx, 0
         else:
             r, c = idx // cols, idx % cols
-        sheet.paste(frame, (c * frame_size, r * frame_size))
+            
+        # Posisikan di tengah cell grid agar rapi
+        cell_x = (c * max_w) + (max_w - frame.width) // 2
+        cell_y = (r * max_h) + (max_h - frame.height) // 2
+        sheet.paste(frame, (cell_x, cell_y), frame)
+        
     return sheet, cols, rows
 
 # 6. SIDEBAR CONTROLS
@@ -341,7 +343,7 @@ if uploaded_file is not None:
     st.markdown("---")
     st.markdown(f"### 🖼️ Hasil Sprite Sheet ({st.session_state.sheet_layout_option})")
     
-    sprite_sheet, f_cols, f_rows = compile_spritesheet(frames_3d, canvas_res, st.session_state.sheet_layout_option, st.session_state.grid_cols)
+    sprite_sheet, f_cols, f_rows = compile_spritesheet(frames_3d, st.session_state.sheet_layout_option, st.session_state.grid_cols)
     st.image(sprite_sheet, caption=f"Sprite Sheet Layout ({f_cols} Kolom x {f_rows} Baris - Resolusi: {sprite_sheet.width}x{sprite_sheet.height} px)", use_container_width=False)
 
     sheet_io = io.BytesIO()
