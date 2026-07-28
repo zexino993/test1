@@ -7,7 +7,7 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="Modular Sprite Studio v2.8 with 2D/3D Mode",
+    page_title="Modular Sprite Studio v2.9 (2D + XYZ Axis)",
     page_icon="🔄",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -24,8 +24,9 @@ default_states = {
     "anim_fps": 8,
     "use_voxel_depth": False,
     "voxel_thickness": 8,
-    "use_axis_tilts": False,
+    "use_axis_tilts": True,
     "tilt_x_deg": 0,
+    "tilt_y_deg": 0,
     "tilt_z_deg": 0,
     "use_bounce": False,
     "use_glow": False,
@@ -54,6 +55,7 @@ def reset_voxel():
 def reset_tilts():
     st.session_state.use_axis_tilts = default_states["use_axis_tilts"]
     st.session_state.tilt_x_deg = default_states["tilt_x_deg"]
+    st.session_state.tilt_y_deg = default_states["tilt_y_deg"]
     st.session_state.tilt_z_deg = default_states["tilt_z_deg"]
 
 def reset_fx():
@@ -117,13 +119,13 @@ st.markdown("""
 # 4. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🔄 Modular Sprite Studio v2.8</div>
-    <div class="studio-subtitle">Pilihan Mode Rotasi: 2D Flat Spin vs 3D Spatial Rotation & Tombol Reset Modular Lengkap!</div>
+    <div class="studio-title">🔄 Modular Sprite Studio v2.9</div>
+    <div class="studio-subtitle">Rotasi 2D Datar dengan Kontrol Penuh Kemiringan Sumbu X, Y, dan Z yang Fleksibel!</div>
 </div>
 """, unsafe_allow_html=True)
 
-# 5. RENDER ENGINE DENGAN PILIHAN 2D / 3D ROTATION MODE
-def render_frame(img, angle_deg, tilt_x_deg, tilt_z_deg, scale_factor, canvas_size, 
+# 5. RENDER ENGINE 2D + XYZ AXIS
+def render_frame(img, angle_deg, tilt_x_deg, tilt_y_deg, tilt_z_deg, scale_factor, canvas_size, 
                  use_rotation_y, rot_mode, use_voxel_depth, voxel_thickness, 
                  use_axis_tilts, use_bounce, use_glow):
     w, h = img.size
@@ -136,12 +138,13 @@ def render_frame(img, angle_deg, tilt_x_deg, tilt_z_deg, scale_factor, canvas_si
     
     working_img = base_img
 
+    # 1. ROTASI UTAMA (2D Datar atau 3D Spasial)
     if use_rotation_y:
         if "2D" in rot_mode:
-            # Mode 2D: Murni memutar gambar datar pada poros tengah (2D rotation)
+            # Rotasi 2D murni (Roll di sumbu Z)
             working_img = base_img.rotate(angle_deg, resample=Image.NEAREST, expand=True)
         else:
-            # Mode 3D: Efek putar spasial (menyusut menyamping membentuk volume 3D)
+            # Rotasi 3D Spatial
             rad_y = math.radians(angle_deg)
             scale_w = max(0.1, abs(math.cos(rad_y)))
             scaled_w = max(4, int(base_img.width * scale_w))
@@ -152,6 +155,7 @@ def render_frame(img, angle_deg, tilt_x_deg, tilt_z_deg, scale_factor, canvas_si
                 
             working_img = curr_img.resize((scaled_w, curr_img.height), resample=Image.NEAREST)
 
+    # 2. VOXEL DEPTH (Hanya aktif jika mode 3D)
     if use_voxel_depth and voxel_thickness > 0 and "3D" in rot_mode:
         rad_y = math.radians(angle_deg)
         steps = max(1, voxel_thickness)
@@ -174,13 +178,23 @@ def render_frame(img, angle_deg, tilt_x_deg, tilt_z_deg, scale_factor, canvas_si
             voxel_canvas.paste(layer_img, (p_x, p_y), layer_img)
         working_img = voxel_canvas
 
-    if use_axis_tilts and (tilt_x_deg != 0 or tilt_z_deg != 0):
+    # 3. KEMIRINGAN SUMBU X, Y, DAN Z (Bisa dimainkan bebas kapan saja)
+    if use_axis_tilts and (tilt_x_deg != 0 or tilt_y_deg != 0 or tilt_z_deg != 0):
+        # Sumbu Z (Roll / Kemiringan Samping)
         if tilt_z_deg != 0:
             working_img = working_img.rotate(tilt_z_deg, resample=Image.NEAREST, expand=True)
+            
+        # Sumbu X (Pitch / Kemiringan Atas-Bawah) lewat skala vertikal
         if tilt_x_deg != 0:
             rad_x = math.radians(tilt_x_deg)
-            new_height = max(4, int(working_img.height * max(0.2, abs(math.cos(rad_x)))))
+            new_height = max(4, int(working_img.height * max(0.1, abs(math.cos(rad_x)))))
             working_img = working_img.resize((working_img.width, new_height), resample=Image.NEAREST)
+            
+        # Sumbu Y (Yaw / Kemiringan Samping Tambahan) lewat skala horizontal
+        if tilt_y_deg != 0:
+            rad_y_tilt = math.radians(tilt_y_deg)
+            new_width = max(4, int(working_img.width * max(0.1, abs(math.cos(rad_y_tilt)))))
+            working_img = working_img.resize((new_width, working_img.height), resample=Image.NEAREST)
 
     if use_glow:
         glow_layer = working_img.filter(ImageFilter.GaussianBlur(radius=4))
@@ -254,16 +268,17 @@ if uploaded_file is not None:
     if st.session_state.use_voxel_depth:
         st.session_state.voxel_thickness = st.sidebar.slider("Ketebalan Voxel:", 1, 30, st.session_state.voxel_thickness, 1)
 
-    # --- FITUR 3: KEMIRINGAN SUMBU X & Z ---
+    # --- FITUR 3: KEMIRINGAN SUMBU X, Y, Z ---
     st.sidebar.markdown("---")
     col_h3, col_r3 = st.sidebar.columns([3, 1])
-    col_h3.markdown("### 📐 Kemiringan X & Z")
+    col_h3.markdown("### 📐 Kemiringan Sumbu X, Y, Z")
     col_r3.button("Reset", key="btn_reset_tilts", on_click=reset_tilts)
     
-    st.session_state.use_axis_tilts = st.sidebar.checkbox("Aktifkan Kemiringan X & Z", value=st.session_state.use_axis_tilts)
+    st.session_state.use_axis_tilts = st.sidebar.checkbox("Aktifkan Kemiringan Sumbu X, Y, Z", value=st.session_state.use_axis_tilts)
     if st.session_state.use_axis_tilts:
-        st.session_state.tilt_x_deg = st.sidebar.slider("Sudut X (Pitch / Atas-Bawah):", -90, 90, st.session_state.tilt_x_deg, 5)
-        st.session_state.tilt_z_deg = st.sidebar.slider("Sudut Z (Roll / Miring Samping):", -180, 180, st.session_state.tilt_z_deg, 5)
+        st.session_state.tilt_x_deg = st.sidebar.slider("Sudut Sumbu X (Pitch / Atas-Bawah):", -90, 90, st.session_state.tilt_x_deg, 5)
+        st.session_state.tilt_y_deg = st.sidebar.slider("Sudut Sumbu Y (Yaw / Lebar Samping):", -90, 90, st.session_state.tilt_y_deg, 5)
+        st.session_state.tilt_z_deg = st.sidebar.slider("Sudut Sumbu Z (Roll / Miring Putar):", -180, 180, st.session_state.tilt_z_deg, 5)
 
     # --- FITUR 4: SPECIAL FX ---
     st.sidebar.markdown("---")
@@ -304,7 +319,7 @@ if uploaded_file is not None:
         current_angle = st.session_state.start_angle + (progress * st.session_state.total_sweep * dir_multiplier)
         
         frame = render_frame(
-            src_img, current_angle, st.session_state.tilt_x_deg, st.session_state.tilt_z_deg, 
+            src_img, current_angle, st.session_state.tilt_x_deg, st.session_state.tilt_y_deg, st.session_state.tilt_z_deg, 
             st.session_state.scale_factor, canvas_res,
             st.session_state.use_rotation_y, st.session_state.rotation_mode, 
             st.session_state.use_voxel_depth, st.session_state.voxel_thickness,
