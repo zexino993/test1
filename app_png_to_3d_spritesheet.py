@@ -7,8 +7,8 @@ import zipfile
 
 # 1. PAGE CONFIG
 st.set_page_config(
-    page_title="PNG to 3D Directional Sprite Studio v2.4",
-    page_icon="🔄",
+    page_title="Modular Sprite Studio v2.5",
+    page_icon="🎛️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -17,12 +17,12 @@ st.set_page_config(
 st.markdown("""
 <style>
     .stApp {
-        background: linear-gradient(135deg, #090d16 0%, #1a1f35 50%, #0d111a 100%);
+        background: linear-gradient(135deg, #090d16 0%, #161b2e 50%, #0d111a 100%);
         color: #f1f5f9;
         font-family: 'Inter', system-ui, sans-serif;
     }
     .studio-header {
-        background: linear-gradient(90deg, rgba(14, 165, 233, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%);
+        background: linear-gradient(90deg, rgba(14, 165, 233, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%);
         border: 1px solid rgba(125, 211, 252, 0.2);
         backdrop-filter: blur(12px);
         padding: 24px;
@@ -33,7 +33,7 @@ st.markdown("""
     .studio-title {
         font-size: 2.2rem;
         font-weight: 800;
-        background: linear-gradient(90deg, #38bdf8, #c084fc, #f43f5e);
+        background: linear-gradient(90deg, #38bdf8, #c084fc, #ec4899);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin: 0;
@@ -44,7 +44,7 @@ st.markdown("""
         margin-top: 6px;
     }
     .stButton > button, .stDownloadButton > button {
-        background: linear-gradient(135deg, #0ea5e9 0%, #a855f7 100%) !important;
+        background: linear-gradient(135deg, #0ea5e9 0%, #ec4899 100%) !important;
         color: #ffffff !important;
         border-radius: 10px !important;
         font-weight: 700 !important;
@@ -65,13 +65,16 @@ st.markdown("""
 # 3. HEADER
 st.markdown("""
 <div class="studio-header">
-    <div class="studio-title">🔄 Directional 3D Sprite Studio v2.4</div>
-    <div class="studio-subtitle">Atur Arah Putaran (Kiri/Kanan), Derajat Sudut 360°, dan Sudut Pandang Kamera (Depan/Samping/Isometrik)!</div>
+    <div class="studio-title">🎛️ Modular Sprite Studio v2.5</div>
+    <div class="studio-subtitle">Pilih Fitur yang Ingin Diaktifkan Secara Bebas: Pure 2D 360° Rotation, 3D Voxel Extrusion, Tilt, & FX!</div>
 </div>
 """, unsafe_allow_html=True)
 
-# 4. DIRECTIONAL & PERSPECTIVE 3D ENGINE
-def generate_directional_3d_frame(img, current_angle_deg, tilt_x, tilt_z, depth_thickness, scale_factor, canvas_size, mode):
+# 4. MODULAR RENDER ENGINE
+def render_modular_frame(img, current_angle_deg, scale_factor, canvas_size, 
+                           use_pure_2d_rot, use_voxel_depth, voxel_thickness, 
+                           use_tilt, tilt_x, tilt_z, 
+                           use_bounce, use_glow):
     w, h = img.size
     new_w = max(1, int(w * scale_factor))
     new_h = max(1, int(h * scale_factor))
@@ -80,82 +83,53 @@ def generate_directional_3d_frame(img, current_angle_deg, tilt_x, tilt_z, depth_
     canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     center = canvas_size // 2
     
-    rad_y = math.radians(current_angle_deg)
-    rad_x = math.radians(tilt_x)
-    rad_z = math.radians(tilt_z)
-    
-    if mode == "🧱 Voxel Solid Extrusion (Tebal & Berisi)":
-        steps = max(1, depth_thickness)
+    # 1. FITUR PURE 2D 360° ROTATION (Murni berputar tanpa gepeng aneh)
+    if use_pure_2d_rot:
+        # Menggunakan rotasi PIL terpusat dengan expand=False agar ukuran konsisten di tengah
+        working_img = base_img.rotate(current_angle_deg, resample=Image.NEAREST, expand=False)
+    else:
+        working_img = base_img
+
+    # 2. FITUR 3D VOXEL EXTRUSION DEPTH (Menambah ketebalan ke belakang)
+    if use_voxel_depth and voxel_thickness > 0:
+        rad_y = math.radians(current_angle_deg)
+        steps = max(1, voxel_thickness)
+        
+        voxel_canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
         for z in range(steps, -1, -1):
-            shift_x = int(z * math.sin(rad_y) * 0.9 + math.sin(rad_z) * 10)
-            shift_y = int(z * 0.25 + math.sin(rad_x) * 15)
+            shift_x = int(z * math.sin(rad_y) * 0.8)
+            shift_y = int(z * 0.2)
             
             if z > 0:
-                np_layer = np.array(base_img).astype(np.float32)
+                np_layer = np.array(working_img).astype(np.float32)
                 shade = max(0.35, 1.0 - (z / steps) * 0.45)
                 np_layer[:, :, :3] *= shade
                 layer_img = Image.fromarray(np_layer.astype(np.uint8))
             else:
-                layer_img = base_img
+                layer_img = working_img
 
-            paste_x = center - (layer_img.width // 2) + shift_x
-            paste_y = center - (layer_img.height // 2) - shift_y
-            canvas.paste(layer_img, (paste_x, paste_y), layer_img)
+            p_x = center - (layer_img.width // 2) + shift_x
+            p_y = center - (layer_img.height // 2) - shift_y
+            voxel_canvas.paste(layer_img, (p_x, p_y), layer_img)
+        working_img = voxel_canvas
 
-    elif mode == "🔄 Smooth Billboard Spin (Putar 360° Mulus)":
-        radius_orbit = depth_thickness * 1.5
-        orbit_x = int(math.cos(rad_y) * radius_orbit)
-        scale_w = max(0.2, abs(math.cos(rad_y)))
-        scaled_w = max(4, int(base_img.width * scale_w))
-        
-        curr_img = base_img
-        if math.sin(rad_y) < 0:
-            curr_img = ImageOps.mirror(base_img)
-            
-        final_w_img = curr_img.resize((scaled_w, curr_img.height), resample=Image.NEAREST)
-        
-        # Terapkan kemiringan sudut pandang X dan Z
-        final_w_img = final_w_img.rotate(tilt_z, resample=Image.NEAREST, expand=True)
-        
-        paste_x = center - (final_w_img.width // 2) + orbit_x
-        paste_y = center - (final_w_img.height // 2) + int(math.sin(rad_x) * 20)
-        canvas.paste(final_w_img, (paste_x, paste_y), final_w_img)
+    # 3. FITUR PERSPECTIVE TILT (Kemiringan Sudut Pandang X & Z)
+    if use_tilt and (tilt_x != 0 or tilt_z != 0):
+        working_img = working_img.rotate(tilt_z, resample=Image.NEAREST, expand=True)
 
-    elif mode == "🧊 Isometric Box Projection (Kotak Isometrik)":
-        steps = max(2, depth_thickness)
-        for z in range(steps, -1, -1):
-            shift_x = int(z * math.cos(rad_y) * 0.7 + math.sin(rad_z) * 12)
-            shift_y = int(z * math.sin(rad_y) * 0.7 + math.sin(rad_x) * 12)
-            
-            np_layer = np.array(base_img).astype(np.float32)
-            shade = max(0.3, 1.0 - (z / steps) * 0.5)
-            np_layer[:, :, :3] *= shade
-            layer_img = Image.fromarray(np_layer.astype(np.uint8))
+    # 4. FITUR SPECIAL FX (Glow & Bounce)
+    if use_glow:
+        glow_layer = working_img.filter(ImageFilter.GaussianBlur(radius=4))
+        canvas.paste(glow_layer, (center - glow_layer.width//2, center - glow_layer.height//2), glow_layer)
 
-            paste_x = center - (layer_img.width // 2) + shift_x
-            paste_y = center - (layer_img.height // 2) + shift_y
-            canvas.paste(layer_img, (paste_x, paste_y), layer_img)
+    bounce_offset = 0
+    if use_bounce:
+        bounce_offset = int(abs(math.sin(math.radians(current_angle_deg * 2))) * 8)
 
-    else: # Mode "🌟 Curved Dome / Coin Spin (Koin / Permata Cembung)"
-        steps = max(2, depth_thickness)
-        for z in range(steps, -1, -1):
-            expansion = math.cos((z / steps) * (math.pi / 2)) * (depth_thickness * 0.8)
-            current_scale = 1.0 + (expansion / max(1, base_img.width)) * math.cos(rad_y)
-            
-            w_c = max(4, int(base_img.width * current_scale))
-            h_c = max(4, int(base_img.height * current_scale))
-            scaled_layer = base_img.resize((w_c, h_c), resample=Image.NEAREST)
-            
-            orbit_x = int(math.cos(rad_y) * (depth_thickness * 1.2))
-            
-            np_layer = np.array(scaled_layer).astype(np.float32)
-            shade = max(0.4, 0.7 + 0.3 * math.cos(rad_y + (z / steps)))
-            np_layer[:, :, :3] *= shade
-            shaded_layer = Image.fromarray(np_layer.astype(np.uint8))
-
-            paste_x = center - (shaded_layer.width // 2) + orbit_x
-            paste_y = center - (shaded_layer.height // 2) + int(math.sin(rad_x) * 10)
-            canvas.paste(shaded_layer, (paste_x, paste_y), shaded_layer)
+    # Tempel akhir ke canvas utama
+    paste_x = center - (working_img.width // 2)
+    paste_y = center - (working_img.height // 2) - bounce_offset
+    canvas.paste(working_img, (paste_x, paste_y), working_img)
 
     return canvas
 
@@ -197,51 +171,47 @@ if uploaded_file is not None:
     src_img = Image.open(uploaded_file).convert("RGBA")
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🔄 2. Pengaturan Arah & Putaran 360°")
-    rotation_direction = st.sidebar.radio(
-        "Arah Putaran:",
-        ["➡️ Searah Jarum Jam (Clockwise / Kanan)", "⬅️ Berlawanan Jarum Jam (Counter-Clockwise / Kiri)"]
-    )
+    st.sidebar.markdown("### 🎛️ 2. Panel Pilihan Fitur (Modular Toggles)")
     
-    start_angle = st.sidebar.slider("Sudut Awal Mulai (°):", 0, 360, 0, 15)
-    total_sweep = st.sidebar.slider("Total Rentang Putaran (°):", 90, 360, 360, 45)
-    total_frames = st.sidebar.slider("Jumlah Frame (Resolusi Animasi):", 4, 36, 12, 2)
+    # Checkbox utama untuk mengaktifkan/menonaktifkan fitur secara spesifik
+    use_pure_2d_rot = st.sidebar.checkbox("🔄 Aktifkan Pure 2D 360° Rotation", value=True)
+    use_voxel_depth = st.sidebar.checkbox("🧱 Aktifkan 3D Voxel Extrusion (Ketebalan)", value=False)
+    use_tilt        = st.sidebar.checkbox("📐 Aktifkan Sudut Kamera (Tilt X/Z)", value=False)
+    use_bounce      = st.sidebar.checkbox("🍮 Aktifkan Efek Jelly Bounce", value=False)
+    use_glow        = st.sidebar.checkbox("✨ Aktifkan Efek Glow / Pendaran", value=False)
+
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### ⚙️ 3. Pengaturan Parameter Fitur")
+    
+    if use_pure_2d_rot:
+        rotation_direction = st.sidebar.radio(
+            "Arah Putaran 2D:",
+            ["➡️ Searah Jarum Jam (Clockwise)", "⬅️ Berlawanan Jarum Jam (Counter-Clockwise)"]
+        )
+        start_angle = st.sidebar.slider("Sudut Awal (°):", 0, 360, 0, 15)
+        total_sweep = st.sidebar.slider("Total Rentang Putaran (°):", 90, 360, 360, 45)
+    else:
+        rotation_direction = "➡️ Searah Jarum Jam (Clockwise)"
+        start_angle, total_sweep = 0, 360
+
+    total_frames = st.sidebar.slider("Jumlah Frame Animasi:", 4, 36, 12, 2)
     anim_fps = st.sidebar.slider("Preview Kecepatan (FPS):", 2, 30, 8, 1)
 
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📐 3. Sudut Pandang Kamera (Angle & Perspective)")
-    view_angle_mode = st.sidebar.selectbox(
-        "Preset Sudut Pandang:",
-        ["Kustom (Atur Manual)", "Tampak Depan (Front View)", "Tampak Samping (Side View)", "Tampak Atas / Isometrik (Top-Down/Isometric)"]
-    )
-    
-    if view_angle_mode == "Tampak Depan (Front View)":
-        tilt_x, tilt_z = 0, 0
-    elif view_angle_mode == "Tampak Samping (Side View)":
-        tilt_x, tilt_z = 15, 90
-    elif view_angle_mode == "Tampak Atas / Isometrik (Top-Down/Isometric)":
-        tilt_x, tilt_z = 45, 0
+    if use_voxel_depth:
+        voxel_thickness = st.sidebar.slider("Ketebalan Voxel (Depth Layers):", 1, 30, 8, 1)
     else:
-        tilt_x = st.sidebar.slider("Kemiringan Vertikal (Sumbu X - Atas/Bawah):", -90, 90, 0, 5)
-        tilt_z = st.sidebar.slider("Kemiringan Rotasi (Sumbu Z - Miring Kiri/Kanan):", -180, 180, 0, 5)
+        voxel_thickness = 0
+
+    if use_tilt:
+        tilt_x = st.sidebar.slider("Kemiringan Vertikal (X):", -90, 90, 0, 5)
+        tilt_z = st.sidebar.slider("Kemiringan Rotasi (Z):", -180, 180, 0, 5)
+    else:
+        tilt_x, tilt_z = 0, 0
+
+    scale_factor = st.sidebar.slider("Skala Ukuran Objek:", 0.5, 3.0, 1.2, 0.1)
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🧊 4. Gaya Rendering 3D & Ketebalan")
-    mode_3d = st.sidebar.selectbox(
-        "Gaya 3D:",
-        [
-            "🧱 Voxel Solid Extrusion (Tebal & Berisi)",
-            "🔄 Smooth Billboard Spin (Putar 360° Mulus)",
-            "🧊 Isometric Box Projection (Kotak Isometrik)",
-            "🌟 Curved Dome / Coin Spin (Koin Cembung)"
-        ]
-    )
-    
-    depth_thickness = st.sidebar.slider("Ketebalan / Kedalaman Objek:", 1, 30, 10, 1)
-    scale_factor = st.sidebar.slider("Skala Ukuran Objek:", 0.5, 3.0, 1.5, 0.1)
-
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🖼️ 5. Layout Sprite Sheet")
+    st.sidebar.markdown("### 📐 4. Layout Sprite Sheet")
     sheet_layout_option = st.sidebar.selectbox(
         "Pilih Orientasi Layout:",
         ["Horizontal Only (1 Baris Saja)", "Vertical Only (1 Kolom Saja)", "Grid Custom (Multi Kolom/Baris)"]
@@ -257,11 +227,11 @@ if uploaded_file is not None:
         st.markdown("##### Gambar Asli (2D)")
         st.image(src_img, use_container_width=True)
 
-    # Hitung ukuran canvas aman
-    canvas_res = max(128, int(max(src_img.width, src_img.height) * scale_factor * 2.5))
+    # Ukuran canvas aman
+    canvas_res = max(128, int(max(src_img.width, src_img.height) * scale_factor * 2.2))
     canvas_res = min(512, canvas_res)
 
-    # Kalkulasi sudut berdasarkan arah putaran (Kiri/Kanan)
+    # Kalkulasi frame render
     frames_3d = []
     dir_multiplier = 1 if "Searah" in rotation_direction else -1
 
@@ -269,7 +239,11 @@ if uploaded_file is not None:
         progress = i / float(max(1, total_frames - 1)) if total_frames > 1 else 0
         current_angle = start_angle + (progress * total_sweep * dir_multiplier)
         
-        frame = generate_directional_3d_frame(src_img, current_angle, tilt_x, tilt_z, depth_thickness, scale_factor, canvas_res, mode_3d)
+        frame = render_modular_frame(
+            src_img, current_angle, scale_factor, canvas_res,
+            use_pure_2d_rot, use_voxel_depth, voxel_thickness,
+            use_tilt, tilt_x, tilt_z, use_bounce, use_glow
+        )
         frames_3d.append(frame)
 
     with col_prev2:
@@ -281,10 +255,10 @@ if uploaded_file is not None:
         )
         gif_bytes = gif_io.getvalue()
         st.image(gif_bytes, use_container_width=True)
-        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name="sprite_directional_animation.gif", mime="image/gif", use_container_width=True)
+        st.download_button("💾 Download GIF Preview (.gif)", data=gif_bytes, file_name="sprite_modular_animation.gif", mime="image/gif", use_container_width=True)
 
     st.markdown("---")
-    st.markdown(f"### 🖼️ 6. Hasil Sprite Sheet ({sheet_layout_option})")
+    st.markdown(f"### 🖼️ 5. Hasil Sprite Sheet ({sheet_layout_option})")
     
     sprite_sheet, f_cols, f_rows = compile_spritesheet(frames_3d, canvas_res, sheet_layout_option, grid_cols)
     st.image(sprite_sheet, caption=f"Sprite Sheet Layout ({f_cols} Kolom x {f_rows} Baris - Resolusi: {sprite_sheet.width}x{sprite_sheet.height} px)", use_container_width=False)
@@ -296,7 +270,7 @@ if uploaded_file is not None:
     st.download_button(
         "💾 Download Sprite Sheet (.png)", 
         data=sheet_bytes, 
-        file_name="sprite_sheet_directional.png", 
+        file_name="sprite_sheet_modular.png", 
         mime="image/png", 
         use_container_width=True
     )
@@ -314,10 +288,10 @@ if uploaded_file is not None:
     st.download_button(
         "📦 Download Full Package (.zip)", 
         data=zip_io.getvalue(), 
-        file_name="Directional_SpriteSheet_Package.zip", 
+        file_name="Modular_SpriteSheet_Package.zip", 
         mime="application/zip", 
         use_container_width=True
     )
 
 else:
-    st.info("👈 Silakan unggah file PNG transparan di panel kiri untuk mulai mengatur arah putaran dan sudut pandang kameranya!")
+    st.info("👈 Silakan unggah file PNG transparan di panel kiri untuk mulai memilih fitur yang ingin diaktifkan!")
