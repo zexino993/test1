@@ -8,7 +8,7 @@ import streamlit as st
 # 1. KONFIGURASI HALAMAN & THEME UI/UX
 # ==========================================
 st.set_page_config(
-    page_title="Terraria Sprite Master Studio v19.1",
+    page_title="Terraria Sprite Master Studio v19.2",
     page_icon="⚔️",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -51,8 +51,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚔️ Terraria Sprite Master Studio v19.1 Pro")
-st.caption("Studio All-in-One: **Precision Magic Wand**, **Dual Image Merger**, **Canvas Resizer**, **Multi-Motion Engine**, & **Palette Extractor**.")
+st.title("⚔️ Terraria Sprite Master Studio v19.2 Pro")
+st.caption("Studio All-in-One: **Selective Aspect Merger**, **Precision Magic Wand**, **Fitting Preview**, & **Motion Engine**.")
 
 # ==========================================
 # 2. PRESET PALET WARNA & TEKSTUR LIST
@@ -138,13 +138,23 @@ with st.expander("🎛️ PANEL KONTROL & PENGATURAN SPRITE (KLIK UNTUK BUKA / T
     ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns(4)
 
     with ctrl_col1:
-        st.markdown("##### 📁 1. Input & Image Merger")
+        st.markdown("##### 📁 1. Input & Selective Aspect Merger")
         uploaded_file = st.file_uploader("Upload PNG Utama (Sprite 1)", type=["png"])
         
-        # FITUR BARU: Dual Image Merger Upload Image 2
-        enable_merger = st.checkbox("🧩 Aktifkan Dual Image Merger", value=False)
-        uploaded_file_2 = st.file_uploader("Upload PNG Kedua (Sprite 2 / Overlay)", type=["png"])
+        # FITUR: Selective Aspect Merger
+        enable_aspect_merger = st.checkbox("🧩 Aktifkan Selective Aspect Merger", value=False)
+        uploaded_file_2 = st.file_uploader("Upload PNG Kedua (Sprite 2 / Sumber Aspek)", type=["png"])
         
+        if enable_aspect_merger:
+            st.markdown("Pilih aspek dari Sprite 2 yang ingin dilebur:")
+            merge_aspect_rgb = st.checkbox("🎨 Gabungkan Warna Utama (RGB)", value=True)
+            merge_aspect_glow = st.checkbox("💡 Gabungkan Aspek Glow / Area Terang", value=False)
+            merge_aspect_alpha = st.checkbox("👻 Gabungkan Bentuk Transparansi (Alpha)", value=True)
+            merge_aspect_outline = st.checkbox("✒️ Gabungkan Garis Tepi (Outline)", value=False)
+            merger_blend_mode = st.selectbox("Mode Blending Aspek:", ["Alpha Normal Overlay", "Blend Multiply", "Screen Light"])
+            merger_off_x = st.slider("Offset Geser X", -30, 30, 0)
+            merger_off_y = st.slider("Offset Geser Y", -30, 30, 0)
+
         sprite_type = st.selectbox(
             "Jenis Sprite:",
             ["Item / Senjata / Aksesori", "Tile / Blok / Wall", "Character / NPC / Pet", "Projectiles / FX"]
@@ -153,7 +163,6 @@ with st.expander("🎛️ PANEL KONTROL & PENGATURAN SPRITE (KLIK UNTUK BUKA / T
         pastel_mode = st.checkbox("🌸 Soft RGB Pastel Tone", key="pastel_mode_val")
         zoom = st.slider("🔍 Zoom Magnifier", 1, 10, 4)
 
-        # Canvas Resizer & Padding
         st.markdown("---")
         st.markdown("##### 🔲 Canvas Resizer")
         enable_resize = st.checkbox("Aktifkan Canvas Expansion", value=False)
@@ -241,46 +250,56 @@ def expand_canvas(img_rgba, new_w, new_h):
     new_canvas.paste(img_rgba, (offset_x, offset_y))
     return new_canvas
 
-# HELPER FITUR: Dual Image Merger Compositor
-def merge_two_sprites(img1, img2, merge_mode, offset_x, offset_y):
+# HELPER FITUR: Selective Aspect Merger
+def selective_merge_aspects(img1, img2, use_rgb, use_glow, use_alpha, use_outline, mode, off_x, off_y):
     if img2 is None: return img1
     w1, h1 = img1.size
     w2, h2 = img2.size
     
-    # Buat kanvas gabungan dengan ukuran menyesuaikan sprite terbesar / offset
-    max_w = max(w1, w2 + abs(offset_x))
-    max_h = max(h1, h2 + abs(offset_y))
+    max_w = max(w1, w2 + abs(off_x))
+    max_h = max(h1, h2 + abs(off_y))
     
-    canvas = Image.new("RGBA", (max_w, max_h), (0, 0, 0, 0))
+    canvas1 = Image.new("RGBA", (max_w, max_h), (0, 0, 0, 0))
+    canvas2 = Image.new("RGBA", (max_w, max_h), (0, 0, 0, 0))
     
-    # Paste Sprite 1 di tengah atau posisi dasar
     x1 = (max_w - w1) // 2
     y1 = (max_h - h1) // 2
-    canvas.paste(img1, (x1, y1), img1)
+    canvas1.paste(img1, (x1, y1), img1)
     
-    # Paste Sprite 2 dengan mode blending & offset kustom
-    x2 = x1 + offset_x
-    y2 = y1 + offset_y
+    x2 = x1 + off_x
+    y2 = y1 + off_y
+    canvas2.paste(img2, (x2, y2), img2)
     
-    if merge_mode == "Alpha Composite (Normal Layer Over)":
-        temp_layer = Image.new("RGBA", (max_w, max_h), (0, 0, 0, 0))
-        temp_layer.paste(img2, (x2, y2), img2)
-        canvas = Image.alpha_composite(canvas, temp_layer)
-    elif merge_mode == "Blend Multiply (Efek Bayangan/Tumpuk Gelap)":
-        temp_layer = Image.new("RGBA", (max_w, max_h), (255, 255, 255, 0))
-        temp_layer.paste(img2, (x2, y2), img2)
-        canvas = Image.blend(canvas.convert("RGB"), temp_layer.convert("RGB"), 0.5).convert("RGBA")
-    elif merge_mode == "Screen (Efek Cahaya Terang)":
-        temp_layer = Image.new("RGBA", (max_w, max_h), (0, 0, 0, 0))
-        temp_layer.paste(img2, (x2, y2), img2)
-        canvas = ImageChops.screen(canvas, temp_layer)
-    elif merge_mode == "Side-by-Side (Bersebelahan Horizontal)":
-        side_canvas = Image.new("RGBA", (w1 + w2, max(h1, h2)), (0, 0, 0, 0))
-        side_canvas.paste(img1, (0, (max(h1, h2) - h1)//2))
-        side_canvas.paste(img2, (w1, (max(h1, h2) - h2)//2), img2)
-        return side_canvas
+    arr1 = np.array(canvas1, dtype=np.float32)
+    arr2 = np.array(canvas2, dtype=np.float32)
+    
+    # Ekstraksi aspek berdasarkan pilihan pengguna
+    out_arr = arr1.copy()
+    
+    if use_rgb:
+        # Ganti channel RGB (Warna Utama) dari img2
+        mask_rgb = (arr2[:, :, 3:] > 0) & (arr1[:, :, 3:] > 0) if mode == "Alpha Normal Overlay" else (arr2[:, :, 3:] > 0)
+        out_arr[:, :, :3] = np.where(mask_rgb, arr2[:, :, :3], out_arr[:, :, :3])
         
-    return canvas
+    if use_alpha:
+        # Gabungkan bentuk transparan (Alpha)
+        out_arr[:, :, 3] = np.maximum(arr1[:, :, 3], arr2[:, :, 3])
+        
+    if use_glow:
+        # Deteksi area terang/glow dari img2 lalu tambahkan ke img1
+        lum2 = (0.299 * arr2[:, :, 0] + 0.587 * arr2[:, :, 1] + 0.114 * arr2[:, :, 2]) / 255.0
+        glow_mask2 = (lum2 >= 0.5) & (arr2[:, :, 3] > 0)
+        out_arr[:, :, :3] = np.where(np.expand_dims(glow_mask2, -1), arr2[:, :, :3], out_arr[:, :, :3])
+        out_arr[:, :, 3] = np.where(glow_mask2, 255, out_arr[:, :, 3])
+
+    if use_outline:
+        # Ambil outline/border tepi dari img2
+        pil_temp = Image.fromarray(arr2.astype(np.uint8), mode="RGBA")
+        outline_img = add_border_to_image(pil_temp, color=(0,0,0,255), thickness=1)
+        arr_outline = np.array(outline_img, dtype=np.float32)
+        out_arr = np.where(arr_outline[:, :, 3:] > 0, arr_outline, out_arr)
+
+    return Image.fromarray(np.clip(out_arr, 0, 255).astype(np.uint8), mode="RGBA")
 
 def extract_palette_from_img(img_rgba, num_colors=6):
     img_rgb = img_rgba.convert("RGB")
@@ -556,17 +575,19 @@ if uploaded_file is not None:
     if enable_resize:
         orig_img = expand_canvas(orig_img, target_canvas_w, target_canvas_h)
         
-    # Fitur Dual Image Merger: Jika aktif dan gambar 2 diupload
-    if enable_merger and uploaded_file_2 is not None:
+    # Fitur Selective Aspect Merger
+    if enable_aspect_merger and uploaded_file_2 is not None:
         orig_img_2 = Image.open(uploaded_file_2).convert("RGBA")
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("### 🧩 Pengaturan Merger")
-        merge_mode = st.selectbox("Mode Blending / Gabung:", ["Alpha Composite (Normal Layer Over)", "Blend Multiply (Efek Bayangan/Tumpuk Gelap)", "Screen (Efek Cahaya Terang)", "Side-by-Side (Bersebelahan Horizontal)"])
-        merger_off_x = st.slider("Offset Geser X (Kiri/Kanan)", -50, 50, 0)
-        merger_off_y = st.slider("Offset Geser Y (Atas/Bawah)", -50, 50, 0)
-        
-        # Proses Gabung Gambar 1 dan Gambar 2
-        orig_img = merge_two_sprites(orig_img, orig_img_2, merge_mode, merger_off_x, merger_off_y)
+        orig_img = selective_merge_aspects(
+            orig_img, orig_img_2, 
+            use_rgb=merge_aspect_rgb, 
+            use_glow=merge_aspect_glow, 
+            use_alpha=merge_aspect_alpha, 
+            use_outline=merge_aspect_outline, 
+            mode=merger_blend_mode, 
+            off_x=merger_off_x, 
+            off_y=merger_off_y
+        )
 
     arr = np.array(orig_img, dtype=np.float32)
 
@@ -591,7 +612,7 @@ if uploaded_file is not None:
     with tab1:
         st.subheader("🖼️ Preview Live Studio Matrix")
         col1, col2, col3, col4 = st.columns(4)
-        col1.caption("1. Sprite Asli / Hasil Merger")
+        col1.caption("1. Sprite Asli / Hasil Selective Merge")
         col1.image(orig_z, use_container_width=True)
         col2.caption("2. Master Sprite FX")
         col2.image(out_z, use_container_width=True)
@@ -602,8 +623,6 @@ if uploaded_file is not None:
 
     with tab2:
         st.subheader("🛡️ Terraria Character Fitting Preview")
-        st.caption("Uji tampilan sprite langsung pada manekin / tubuh karakter Terraria secara live.")
-        
         fit_img = generate_fitting_preview(out_img, sprite_type)
         fit_z = fit_img.resize((fit_img.width * max(2, zoom), fit_img.height * max(2, zoom)), Image.NEAREST)
         
@@ -616,7 +635,6 @@ if uploaded_file is not None:
 
     with tab3:
         st.subheader("🧩 3x3 Tile & Wall Seamless Test")
-        st.caption("Uji pola seamless ubin/dinding dalam kisi 3x3 bertumpuk.")
         grid_3x3 = Image.new("RGBA", (w * zoom * 3, h * zoom * 3), (20, 15, 30, 255))
         for gy in range(3):
             for gx in range(3):
@@ -625,8 +643,6 @@ if uploaded_file is not None:
 
     with tab4:
         st.subheader("📊 Custom Sprite Sheet Generator")
-        st.caption("Buat Sprite Sheet animasi berformat PNG transparan siap pakai untuk Mod Terraria / Game Engine.")
-
         ss_col1, ss_col2 = st.columns(2)
         with ss_col1:
             sheet_anim_type = st.selectbox(
@@ -651,18 +667,15 @@ if uploaded_file is not None:
 
         if st.button("🚀 Generate Sprite Sheet", use_container_width=True):
             sheet_frames = []
-            
             if sheet_anim_type == "Motion Engine Frames":
                 for i in range(frame_count):
                     f_img = generate_pulse_frame(out_img, glow_alpha, i, frame_count, pulse_intensity, pulse_direction, pulse_target, anim_motion_mode)
                     sheet_frames.append(f_img)
-                    
             elif sheet_anim_type == "RGB Rainbow Hue Cycle":
                 hue_step = 360 // frame_count
                 for i in range(frame_count):
                     f_img, _, _, _ = render_studio_all(arr, extra_hue=(i * hue_step))
                     sheet_frames.append(f_img)
-
             elif sheet_anim_type == "Recolor Spectrum Wave":
                 hue_step = 180 // frame_count
                 for i in range(frame_count):
@@ -670,36 +683,22 @@ if uploaded_file is not None:
                     sheet_frames.append(f_img)
 
             spritesheet_img = create_spritesheet(sheet_frames, cols=grid_cols, padding=frame_padding)
-            
             buf_ss = io.BytesIO()
             spritesheet_img.save(buf_ss, format="PNG")
             st.session_state['spritesheet_bytes'] = buf_ss.getvalue()
             st.session_state['spritesheet_size'] = spritesheet_img.size
-            st.session_state['spritesheet_info'] = f"Motion: {anim_motion_mode} | Arah: {pulse_direction}"
 
         if 'spritesheet_bytes' in st.session_state:
             st.divider()
             sw, sh = st.session_state['spritesheet_size']
-            st.write(f"📐 **Ukuran Sprite Sheet:** `{sw} x {sh} pixels` | {st.session_state.get('spritesheet_info', '')}")
-            
             ss_preview_img = Image.open(io.BytesIO(st.session_state['spritesheet_bytes']))
             st.image(ss_preview_img.resize((sw * max(1, zoom//2), sh * max(1, zoom//2)), Image.NEAREST))
-            
-            st.download_button(
-                "💾 Download Sprite Sheet PNG", 
-                data=st.session_state['spritesheet_bytes'], 
-                file_name="TerrariaSprite_Sheet.png", 
-                mime="image/png", 
-                use_container_width=True
-            )
+            st.download_button("💾 Download Sprite Sheet PNG", data=st.session_state['spritesheet_bytes'], file_name="TerrariaSprite_Sheet.png", mime="image/png", use_container_width=True)
 
     with tab5:
         st.subheader("🎬 GIF Motion Studio")
         gif_col1, gif_col2 = st.columns(2)
-
         with gif_col1:
-            st.write(f"**1. Mode Animasi Motion ({anim_motion_mode})**")
-            st.caption(f"Target: {pulse_target} | Arah: {pulse_direction}")
             if st.button("Preview Motion GIF 🎬", key="btn_pulse_prev", use_container_width=True):
                 frames = []
                 num_frames = 12
@@ -707,35 +706,27 @@ if uploaded_file is not None:
                     f_img = generate_pulse_frame(out_img, glow_alpha, i, num_frames, pulse_intensity, pulse_direction, pulse_target, anim_motion_mode)
                     if zoom > 1: f_img = f_img.resize((w * zoom, h * zoom), Image.NEAREST)
                     frames.append(f_img)
-
                 buf_pulse = io.BytesIO()
                 frames[0].save(buf_pulse, format="GIF", save_all=True, append_images=frames[1:], duration=90, loop=0)
                 st.session_state['pulse_gif_bytes'] = buf_pulse.getvalue()
-
             if 'pulse_gif_bytes' in st.session_state:
                 st.image(st.session_state['pulse_gif_bytes'])
 
         with gif_col2:
-            st.write("**2. RGB / Rainbow Cycle Animation**")
-            st.caption("Gelombang Pergeseran Warna Spektrum (360 Derajat)")
             if st.button("Preview RGB Cycle GIF 🌈", key="btn_rgb_prev", use_container_width=True):
                 frames_rgb = []
                 for h_shift in range(0, 360, 30):
                     f_img, _, _, _ = render_studio_all(arr, extra_hue=h_shift)
                     if zoom > 1: f_img = f_img.resize((w * zoom, h * zoom), Image.NEAREST)
                     frames_rgb.append(f_img)
-
                 buf_rgb = io.BytesIO()
                 frames_rgb[0].save(buf_rgb, format="GIF", save_all=True, append_images=frames_rgb[1:], duration=100, loop=0)
                 st.session_state['rgb_gif_bytes'] = buf_rgb.getvalue()
-
             if 'rgb_gif_bytes' in st.session_state:
                 st.image(st.session_state['rgb_gif_bytes'])
 
     with tab6:
-        st.subheader("🎨 Auto Palette Extractor")
-        st.caption("Ekstrak kode warna dominan otomatis langsung dari gambar yang diunggah:")
-        
+        st.subheader("🎨 Auto Palette Extractor & Export Center")
         extracted_colors = extract_palette_from_img(orig_img, num_colors=8)
         if extracted_colors:
             pal_cols = st.columns(len(extracted_colors))
@@ -745,11 +736,7 @@ if uploaded_file is not None:
                     st.code(hex_c)
 
         st.divider()
-        st.subheader("💾 Export Center")
-        st.write("Unduh semua berkas hasil olahan sprite:")
-        
         col_ex1, col_ex2 = st.columns(2)
-        
         buf_main = io.BytesIO()
         out_img.save(buf_main, format="PNG")
         col_ex1.download_button("💾 Download Main Sprite PNG", data=buf_main.getvalue(), file_name="TerrariaSprite_Main.png", mime="image/png", use_container_width=True)
@@ -758,16 +745,5 @@ if uploaded_file is not None:
         glow_img.save(buf_glow, format="PNG")
         col_ex2.download_button("💡 Download Glowmask PNG", data=buf_glow.getvalue(), file_name="TerrariaSprite_Glow.png", mime="image/png", use_container_width=True)
 
-        st.divider()
-        col_ex3, col_ex4 = st.columns(2)
-        if 'pulse_gif_bytes' in st.session_state:
-            col_ex3.download_button("🎬 Download Motion GIF", data=st.session_state['pulse_gif_bytes'], file_name="TerrariaSprite_Motion.gif", mime="image/gif", use_container_width=True)
-        if 'rgb_gif_bytes' in st.session_state:
-            col_ex4.download_button("🌈 Download RGB Cycle GIF", data=st.session_state['rgb_gif_bytes'], file_name="TerrariaSprite_RGB.gif", mime="image/gif", use_container_width=True)
-
-        if 'spritesheet_bytes' in st.session_state:
-            st.divider()
-            st.download_button("📊 Download Sprite Sheet PNG", data=st.session_state['spritesheet_bytes'], file_name="TerrariaSprite_Sheet.png", mime="image/png", use_container_width=True)
-
 else:
-    st.info("👆 Silakan unggah sprite PNG (Senjata, Zirah, NPC, Tile, Pet) pada Panel Kontrol di atas untuk memulai studio!")
+    st.info("👆 Silakan unggah sprite PNG pada Panel Kontrol di atas untuk memulai studio!")
