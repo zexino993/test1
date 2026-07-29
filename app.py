@@ -8,7 +8,7 @@ import streamlit as st
 # 1. KONFIGURASI HALAMAN & THEME UI/UX
 # ==========================================
 st.set_page_config(
-    page_title="Terraria Sprite Master Studio v19.0",
+    page_title="Terraria Sprite Master Studio v19.1",
     page_icon="⚔️",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -51,8 +51,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚔️ Terraria Sprite Master Studio v19.0 Pro")
-st.caption("Studio All-in-One: **Precision Magic Wand**, **Fitting Preview**, **Canvas Resizer**, **Multi-Motion Engine**, & **Palette Extractor**.")
+st.title("⚔️ Terraria Sprite Master Studio v19.1 Pro")
+st.caption("Studio All-in-One: **Precision Magic Wand**, **Dual Image Merger**, **Canvas Resizer**, **Multi-Motion Engine**, & **Palette Extractor**.")
 
 # ==========================================
 # 2. PRESET PALET WARNA & TEKSTUR LIST
@@ -138,8 +138,13 @@ with st.expander("🎛️ PANEL KONTROL & PENGATURAN SPRITE (KLIK UNTUK BUKA / T
     ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns(4)
 
     with ctrl_col1:
-        st.markdown("##### 📁 1. Input & Canvas Resizer")
-        uploaded_file = st.file_uploader("Upload PNG Sprite / Tile", type=["png"])
+        st.markdown("##### 📁 1. Input & Image Merger")
+        uploaded_file = st.file_uploader("Upload PNG Utama (Sprite 1)", type=["png"])
+        
+        # FITUR BARU: Dual Image Merger Upload Image 2
+        enable_merger = st.checkbox("🧩 Aktifkan Dual Image Merger", value=False)
+        uploaded_file_2 = st.file_uploader("Upload PNG Kedua (Sprite 2 / Overlay)", type=["png"])
+        
         sprite_type = st.selectbox(
             "Jenis Sprite:",
             ["Item / Senjata / Aksesori", "Tile / Blok / Wall", "Character / NPC / Pet", "Projectiles / FX"]
@@ -148,7 +153,7 @@ with st.expander("🎛️ PANEL KONTROL & PENGATURAN SPRITE (KLIK UNTUK BUKA / T
         pastel_mode = st.checkbox("🌸 Soft RGB Pastel Tone", key="pastel_mode_val")
         zoom = st.slider("🔍 Zoom Magnifier", 1, 10, 4)
 
-        # FITUR 1: Custom Canvas Resizer & Padding
+        # Canvas Resizer & Padding
         st.markdown("---")
         st.markdown("##### 🔲 Canvas Resizer")
         enable_resize = st.checkbox("Aktifkan Canvas Expansion", value=False)
@@ -172,7 +177,6 @@ with st.expander("🎛️ PANEL KONTROL & PENGATURAN SPRITE (KLIK UNTUK BUKA / T
 
     with ctrl_col3:
         st.markdown("##### 🪄 3. Magic Wand & Filters")
-        # FITUR 2: Magic Wand Precision Color Isolator
         enable_magic_wand = st.checkbox("🪄 Aktifkan Magic Wand (Target Warna)", value=False)
         target_magic_color = st.color_picker("Target Warna Asli Ditukar:", "#FF0000")
         color_tolerance = st.slider("Toleransi Warna (Tolerance):", 0.0, 1.0, 0.2, 0.02)
@@ -196,7 +200,6 @@ with st.expander("🎛️ PANEL KONTROL & PENGATURAN SPRITE (KLIK UNTUK BUKA / T
         st.markdown("##### 🌀 5. Motion & Pulse Engine")
         threshold = st.slider("Sensitivitas Glow Area", 0.1, 0.9, 0.45, 0.02)
         
-        # FITUR 4: Multi-Mode Motion Engine
         anim_motion_mode = st.selectbox(
             "Jenis Gerakan Animasi:",
             ["Pulse Light Wave", "Floating / Bobbing Up-Down", "360° Weapon Swing", "Sci-Fi Glitch Flicker"]
@@ -228,7 +231,6 @@ def add_border_to_image(img_rgba, color=(0,0,0,255), thickness=1):
     border_img.putalpha(mask)
     return Image.alpha_composite(border_img, img_rgba)
 
-# HELPER FITUR 1: Resize Canvas dengan Center Offset
 def expand_canvas(img_rgba, new_w, new_h):
     w, h = img_rgba.size
     if new_w < w and new_h < h: return img_rgba
@@ -239,7 +241,47 @@ def expand_canvas(img_rgba, new_w, new_h):
     new_canvas.paste(img_rgba, (offset_x, offset_y))
     return new_canvas
 
-# HELPER FITUR 5: Palette Extractor
+# HELPER FITUR: Dual Image Merger Compositor
+def merge_two_sprites(img1, img2, merge_mode, offset_x, offset_y):
+    if img2 is None: return img1
+    w1, h1 = img1.size
+    w2, h2 = img2.size
+    
+    # Buat kanvas gabungan dengan ukuran menyesuaikan sprite terbesar / offset
+    max_w = max(w1, w2 + abs(offset_x))
+    max_h = max(h1, h2 + abs(offset_y))
+    
+    canvas = Image.new("RGBA", (max_w, max_h), (0, 0, 0, 0))
+    
+    # Paste Sprite 1 di tengah atau posisi dasar
+    x1 = (max_w - w1) // 2
+    y1 = (max_h - h1) // 2
+    canvas.paste(img1, (x1, y1), img1)
+    
+    # Paste Sprite 2 dengan mode blending & offset kustom
+    x2 = x1 + offset_x
+    y2 = y1 + offset_y
+    
+    if merge_mode == "Alpha Composite (Normal Layer Over)":
+        temp_layer = Image.new("RGBA", (max_w, max_h), (0, 0, 0, 0))
+        temp_layer.paste(img2, (x2, y2), img2)
+        canvas = Image.alpha_composite(canvas, temp_layer)
+    elif merge_mode == "Blend Multiply (Efek Bayangan/Tumpuk Gelap)":
+        temp_layer = Image.new("RGBA", (max_w, max_h), (255, 255, 255, 0))
+        temp_layer.paste(img2, (x2, y2), img2)
+        canvas = Image.blend(canvas.convert("RGB"), temp_layer.convert("RGB"), 0.5).convert("RGBA")
+    elif merge_mode == "Screen (Efek Cahaya Terang)":
+        temp_layer = Image.new("RGBA", (max_w, max_h), (0, 0, 0, 0))
+        temp_layer.paste(img2, (x2, y2), img2)
+        canvas = ImageChops.screen(canvas, temp_layer)
+    elif merge_mode == "Side-by-Side (Bersebelahan Horizontal)":
+        side_canvas = Image.new("RGBA", (w1 + w2, max(h1, h2)), (0, 0, 0, 0))
+        side_canvas.paste(img1, (0, (max(h1, h2) - h1)//2))
+        side_canvas.paste(img2, (w1, (max(h1, h2) - h2)//2), img2)
+        return side_canvas
+        
+    return canvas
+
 def extract_palette_from_img(img_rgba, num_colors=6):
     img_rgb = img_rgba.convert("RGB")
     colors = img_rgb.getcolors(maxcolors=10000)
@@ -247,7 +289,7 @@ def extract_palette_from_img(img_rgba, num_colors=6):
     sorted_colors = sorted(colors, key=lambda x: x[0], reverse=True)
     hex_palette = []
     for count, (r, g, b) in sorted_colors:
-        if (r < 10 and g < 10 and b < 10): continue # Skip near-black transparency background
+        if (r < 10 and g < 10 and b < 10): continue
         hex_code = f"#{r:02x}{g:02x}{b:02x}"
         if hex_code not in hex_palette:
             hex_palette.append(hex_code)
@@ -328,11 +370,10 @@ def render_studio_all(arr, extra_hue=0):
     r_chan, g_chan, b_chan, alpha = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2], arr[:, :, 3]
     lum = (0.299 * r_chan + 0.587 * g_chan + 0.114 * b_chan) / 255.0
 
-    # HELPER FITUR 2: Magic Wand Precision Color Masking
     if enable_magic_wand:
         t_target = np.array(hex_to_rgb(target_magic_color), dtype=np.float32)
         curr_rgb = np.dstack((r_chan, g_chan, b_chan)).astype(np.float32)
-        dist = np.sqrt(np.sum((curr_rgb - t_target)**2, axis=-1)) / 441.673  # Normalized Euclidean Distance
+        dist = np.sqrt(np.sum((curr_rgb - t_target)**2, axis=-1)) / 441.673
         wand_mask = dist <= color_tolerance
     else:
         wand_mask = np.ones((height, width), dtype=bool)
@@ -378,7 +419,6 @@ def render_studio_all(arr, extra_hue=0):
         if st.session_state.pastel_mode_val:
             recolored_rgb = recolored_rgb * 0.6 + 255.0 * 0.4 * (recolored_rgb / 255.0)**0.5
 
-        # Terapkan Magic Wand Masking (Hanya ganti area target)
         orig_rgb = np.dstack((r_chan, g_chan, b_chan)).astype(np.float32)
         out_rgb = np.where(np.expand_dims(wand_mask, axis=-1), recolored_rgb, orig_rgb)
 
@@ -406,7 +446,6 @@ def render_studio_all(arr, extra_hue=0):
 
     return out_img, glow_img, lum, glow_alpha
 
-# MULTI-MODE MOTION & ANIMATION GENERATOR (FITUR 4)
 def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensity, p_direction, p_target, motion_mode):
     if motion_mode == "360° Weapon Swing":
         angle = (frame_idx / float(total_frames)) * 360.0
@@ -427,7 +466,6 @@ def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensi
             arr_glitch[:, :, :3] = np.clip(arr_glitch[:, :, :3] * 1.4, 0, 255).astype(np.uint8)
             return Image.fromarray(arr_glitch, mode="RGBA")
 
-    # Mode Pulse Normal
     base_rgb = np.array(out_img, dtype=np.float32)[:, :, :3]
     alpha_arr = np.array(out_img)[:, :, 3:]
     height, width = glow_alpha.shape
@@ -487,12 +525,8 @@ def create_spritesheet(frames, cols, padding=0):
         
     return sheet
 
-# HELPER FITUR 3: Terraria Mannequin Fitting Preview
 def generate_fitting_preview(sprite_img, slot_type):
-    # Dummy Procedural Terraria Character Mannequin Base Canvas (40x56 px)
     mannequin = Image.new("RGBA", (40, 56), (30, 20, 45, 255))
-    
-    # Simple Character Dummy Body Pixels
     head = Image.new("RGBA", (12, 12), (220, 170, 130, 255))
     body = Image.new("RGBA", (14, 18), (100, 100, 150, 255))
     legs = Image.new("RGBA", (12, 14), (60, 60, 80, 255))
@@ -501,7 +535,6 @@ def generate_fitting_preview(sprite_img, slot_type):
     mannequin.paste(body, (13, 18))
     mannequin.paste(legs, (14, 36))
     
-    # Fitting Attachment Offsets
     sp_w, sp_h = sprite_img.size
     fit_canvas = mannequin.copy()
     
@@ -509,7 +542,7 @@ def generate_fitting_preview(sprite_img, slot_type):
         fit_canvas.paste(sprite_img, (22, 16), sprite_img)
     elif "Character / NPC" in slot_type:
         fit_canvas.paste(sprite_img, ((40 - sp_w)//2, (56 - sp_h)//2), sprite_img)
-    else: # Helmet / Accessory
+    else:
         fit_canvas.paste(sprite_img, ((40 - sp_w)//2, 4), sprite_img)
         
     return fit_canvas
@@ -520,10 +553,21 @@ def generate_fitting_preview(sprite_img, slot_type):
 if uploaded_file is not None:
     orig_img = Image.open(uploaded_file).convert("RGBA")
     
-    # Terapkan Canvas Expansion jika diaktifkan (Fitur 1)
     if enable_resize:
         orig_img = expand_canvas(orig_img, target_canvas_w, target_canvas_h)
         
+    # Fitur Dual Image Merger: Jika aktif dan gambar 2 diupload
+    if enable_merger and uploaded_file_2 is not None:
+        orig_img_2 = Image.open(uploaded_file_2).convert("RGBA")
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 🧩 Pengaturan Merger")
+        merge_mode = st.selectbox("Mode Blending / Gabung:", ["Alpha Composite (Normal Layer Over)", "Blend Multiply (Efek Bayangan/Tumpuk Gelap)", "Screen (Efek Cahaya Terang)", "Side-by-Side (Bersebelahan Horizontal)"])
+        merger_off_x = st.slider("Offset Geser X (Kiri/Kanan)", -50, 50, 0)
+        merger_off_y = st.slider("Offset Geser Y (Atas/Bawah)", -50, 50, 0)
+        
+        # Proses Gabung Gambar 1 dan Gambar 2
+        orig_img = merge_two_sprites(orig_img, orig_img_2, merge_mode, merger_off_x, merger_off_y)
+
     arr = np.array(orig_img, dtype=np.float32)
 
     out_img, glow_img, lum_map, glow_alpha = render_studio_all(arr)
@@ -547,7 +591,7 @@ if uploaded_file is not None:
     with tab1:
         st.subheader("🖼️ Preview Live Studio Matrix")
         col1, col2, col3, col4 = st.columns(4)
-        col1.caption("1. Sprite Asli")
+        col1.caption("1. Sprite Asli / Hasil Merger")
         col1.image(orig_z, use_container_width=True)
         col2.caption("2. Master Sprite FX")
         col2.image(out_z, use_container_width=True)
@@ -556,7 +600,6 @@ if uploaded_file is not None:
         col4.caption("4. RGB Spectrum Shift")
         col4.image(rgb_z, use_container_width=True)
 
-    # TAB FITUR 3: Dual-Layer Armor & Fitting Preview
     with tab2:
         st.subheader("🛡️ Terraria Character Fitting Preview")
         st.caption("Uji tampilan sprite langsung pada manekin / tubuh karakter Terraria secara live.")
@@ -689,7 +732,6 @@ if uploaded_file is not None:
             if 'rgb_gif_bytes' in st.session_state:
                 st.image(st.session_state['rgb_gif_bytes'])
 
-    # TAB FITUR 5: Palette Extractor & Export Center
     with tab6:
         st.subheader("🎨 Auto Palette Extractor")
         st.caption("Ekstrak kode warna dominan otomatis langsung dari gambar yang diunggah:")
