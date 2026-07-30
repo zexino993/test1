@@ -8,7 +8,7 @@ import streamlit as st
 # 1. KONFIGURASI HALAMAN & THEME UI/UX
 # ==========================================
 st.set_page_config(
-    page_title="Terraria Sprite Master Studio v24.2 Ultimate",
+    page_title="Terraria Sprite Master Studio v25.0 Ultimate",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -48,11 +48,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ Terraria Sprite Master Studio v24.2 Ultimate")
-st.caption("Studio All-in-One: **Expanded Weapon Audio Synthesizer (6+ SFX Types)**, **Separate Glow/Non-Glow Color & Opacity**, **Sprite Sheet**, & **GIF Studio**.")
+st.title("⚡ Terraria Sprite Master Studio v25.0 Ultimate")
+st.caption("Studio All-in-One: **25+ 3D Procedural Textures**, **Expanded Audio Synth**, **Separate Glow/Non-Glow Color & Opacity**, & **GIF Studio**.")
 
 # ==========================================
-# 2. PRESET PALET WARNA & 15 TEKSTUR LENGKAP
+# 2. PRESET PALET WARNA & 25+ TEKSTUR LENGKAP
 # ==========================================
 PRESET_NAMES = {
     'manual': 'Custom (Manual)',
@@ -111,7 +111,17 @@ TEX_OPTIONS = [
     ('🍯 Honeycomb (Sarang Lebah/Hex)', 'honey'),
     ('👾 Cyber Glitch (Piksel Digital)', 'glitch'),
     ('🟢 Slime Bubbles (Gelembung Lendir)', 'slime'),
-    ('❄️ Frost Shards (Kristal Es Sharp)', 'frost')
+    ('❄️ Frost Shards (Kristal Es Sharp)', 'frost'),
+    ('⚡ Electric Plasma Arcs (Plasma Listrik)', 'plasma'),
+    ('🧬 DNA Strands / Bio-Organic (Biologis)', 'dna'),
+    ('🌊 Ocean Waves / Ripples (Gelombang Air)', 'waves'),
+    ('🔥 Hellfire Embers (Bara Api)', 'embers'),
+    ('🛡️ Carbon Fiber Weave (Serat Karbon)', 'carbon'),
+    ('🧱 Ancient Brick Wall (Batu Bata Kuno)', 'brick'),
+    ('🐆 Leopard / Tiger Fur (Bulu Corak)', 'fur'),
+    ('🕸️ Spider Web / Crack (Jaring Laba-laba)', 'web'),
+    ('🌠 Starry Night Stardust (Bintang Kejora)', 'stardust'),
+    ('🌀 Vortex Spiral (Pusaran Vortex)', 'vortex')
 ]
 
 if 'shadow_picker' not in st.session_state: st.session_state.shadow_picker = "#080214"
@@ -130,7 +140,7 @@ def on_preset_change():
 # ==========================================
 # 3. TOP CONTROL PANEL
 # ==========================================
-with st.expander("🎛️ PANEL KONTROL STUDIO (WARNA, OPASITAS, & TEKSTUR)", expanded=True):
+with st.expander("🎛️ PANEL KONTROL STUDIO (WARNA, OPASITAS, & 25+ TEKSTUR)", expanded=True):
     ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns(4)
 
     with ctrl_col1:
@@ -166,7 +176,7 @@ with st.expander("🎛️ PANEL KONTROL STUDIO (WARNA, OPASITAS, & TEKSTUR)", ex
 
     with ctrl_col4:
         st.markdown("##### 🔀 4. Tekstur 3D & Animation")
-        tex_primary = st.selectbox("Tekstur Utama:", options=TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
+        tex_primary = st.selectbox("Tekstur Utama (25+ Pilihan):", options=TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
         tex_secondary = st.selectbox("Tekstur Kedua:", options=[('Tidak Ada', 'none')] + TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
         blend_ratio = st.slider("Rasio Blend Tekstur", 0.0, 1.0, 0.3, 0.05)
         tex_intensity = st.slider("Kekuatan Tekstur", 0.0, 1.0, 0.35, 0.05)
@@ -203,20 +213,70 @@ def get_single_texture_map(height, width, tex_type, intensity):
     if tex_type in ['smooth', 'none'] or intensity == 0:
         return np.zeros((height, width), dtype=np.float32)
     y_indices, x_indices = np.indices((height, width))
+    
     if tex_type == 'crystal':
         cell_size = 5
         grid_y, grid_x = y_indices // cell_size, x_indices // cell_size
         hash_val = np.sin(grid_y * 12.9898 + grid_x * 78.233) * 43758.5453
-        return ((hash_val - np.floor(hash_val)) - 0.5) * intensity
+        tex = ((hash_val - np.floor(hash_val)) - 0.5)
     elif tex_type == 'sparkle':
         np.random.seed(123)
-        return np.where(np.random.rand(height, width) > (1.0 - 0.08 * intensity), 0.8, 0.0)
+        tex = np.where(np.random.rand(height, width) > (1.0 - 0.08), 0.8, 0.0)
     elif tex_type == 'veins':
         wave = np.sin(x_indices * 0.2 + np.cos(y_indices * 0.15) * 3.0)
-        return np.where(np.abs(wave) < 0.35, 0.4, -0.15) * intensity
+        tex = np.where(np.abs(wave) < 0.35, 0.4, -0.15)
+    elif tex_type == 'obsidian':
+        tex = np.where(np.sin(x_indices * 0.4 + y_indices * 0.6) > 0.3, 0.4, -0.25)
+    elif tex_type == 'moss':
+        blob = np.sin(x_indices * 0.18) * np.cos(y_indices * 0.18)
+        tex = np.where(blob > 0.3, 0.4, -0.1)
+    elif tex_type == 'cosmic':
+        r = np.sqrt((x_indices - width*0.5)**2 + (y_indices - height*0.5)**2)
+        tex = np.sin(r * 0.2) * 0.5
+    elif tex_type == 'runic':
+        tex = ((x_indices % 4 == 0) | (y_indices % 4 == 0)).astype(np.float32) * 0.5 - 0.1
+    elif tex_type == 'scale':
+        tex = np.where(np.sin(x_indices * 0.5) > 0.2, 0.4, -0.2)
+    elif tex_type == 'wood':
+        ring = np.sin(np.sqrt((x_indices - width*0.5)**2 + (y_indices - height*0.5)**2) * 0.4)
+        tex = ring * 0.35
+    elif tex_type == 'honey':
+        tex = np.where(np.sin(x_indices * 0.4) + np.cos(y_indices * 0.35) > 1.0, 0.5, -0.2)
+    elif tex_type == 'glitch':
+        tex = np.where((x_indices % 6 == 0), 0.6, -0.15)
+    elif tex_type == 'slime':
+        tex = np.where(np.sin(x_indices * 0.25) * np.cos(y_indices * 0.25) > 0.5, 0.45, -0.1)
+    elif tex_type == 'frost':
+        tex = (np.abs(np.sin(x_indices * 0.5 + y_indices * 0.5)) - 0.5) * 0.8
+    elif tex_type == 'plasma':
+        tex = np.sin(x_indices * 0.3 + y_indices * 0.3) * np.cos(x_indices * 0.1)
+    elif tex_type == 'dna':
+        tex = np.sin(x_indices * 0.4 + np.sin(y_indices * 0.2) * 2.0) * 0.5
+    elif tex_type == 'waves':
+        tex = np.sin(np.sqrt(x_indices**2 + y_indices**2) * 0.3) * 0.4
+    elif tex_type == 'embers':
+        np.random.seed(99)
+        tex = np.where(np.random.rand(height, width) > 0.9, 0.7, -0.1)
+    elif tex_type == 'carbon':
+        tex = (((x_indices + y_indices) % 4 == 0)).astype(np.float32) * 0.5 - 0.2
+    elif tex_type == 'brick':
+        tex = (((x_indices % 8 == 0) | (y_indices % 4 == 0))).astype(np.float32) * 0.4 - 0.15
+    elif tex_type == 'fur':
+        np.random.seed(77)
+        tex = (np.sin(x_indices * 0.5) + np.random.uniform(-0.2, 0.2, (height, width))) * 0.3
+    elif tex_type == 'web':
+        tex = np.abs(np.sin(x_indices * 0.2) * np.cos(y_indices * 0.2)) * 0.6 - 0.2
+    elif tex_type == 'stardust':
+        np.random.seed(55)
+        tex = np.where(np.random.rand(height, width) > 0.85, 0.9, -0.05)
+    elif tex_type == 'vortex':
+        theta = np.arctan2(y_indices - height*0.5, x_indices - width*0.5)
+        tex = np.sin(theta * 6.0) * 0.4
     else:
         np.random.seed(42)
-        return (np.random.uniform(-0.3, 0.3, (height, width))) * intensity
+        tex = np.random.uniform(-0.3, 0.3, (height, width))
+        
+    return (tex * intensity).astype(np.float32)
 
 def render_studio_all(arr, extra_hue=0):
     height, width, _ = arr.shape
