@@ -8,7 +8,7 @@ import streamlit as st
 # 1. KONFIGURASI HALAMAN & THEME UI/UX
 # ==========================================
 st.set_page_config(
-    page_title="Terraria Sprite Master Studio v24.1 Ultimate",
+    page_title="Terraria Sprite Master Studio v24.2 Ultimate",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -48,8 +48,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ Terraria Sprite Master Studio v24.1 Ultimate")
-st.caption("Studio All-in-One: **Pilihan Layout Vertikal/Horizontal Sprite Sheet**, **Separate Glow/Non-Glow Opacity & Color**.")
+st.title("⚡ Terraria Sprite Master Studio v24.2 Ultimate")
+st.caption("Studio All-in-One: **Expanded Weapon Audio Synthesizer (6+ SFX Types)**, **Separate Glow/Non-Glow Color & Opacity**, **Sprite Sheet**, & **GIF Studio**.")
 
 # ==========================================
 # 2. PRESET PALET WARNA & 15 TEKSTUR LENGKAP
@@ -308,6 +308,42 @@ def create_spritesheet(frames, layout="Vertical (Terraria Style)", padding=0):
         sheet.paste(frame, (padding + c * (fw + padding), padding + r * (fh + padding)))
     return sheet
 
+def generate_weapon_audio_wav(sfx_type, brightness_val):
+    sample_rate = 22050
+    duration = 0.5
+    t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+    
+    if sfx_type == "⚔️ Sword Slash / Melee Swoosh":
+        freq = 400.0 - (t * 600.0)
+        audio_data = np.sin(2 * np.pi * freq * t) * np.exp(-8.0 * t)
+    elif sfx_type == "🔮 Magic Spell / Mana Chime":
+        freq = 880.0 + np.sin(t * 30.0) * 200.0
+        audio_data = np.sin(2 * np.pi * freq * t) * np.exp(-4.0 * t)
+    elif sfx_type == "⚡ Laser / Sci-Fi Blaster":
+        freq = 1200.0 * np.exp(-15.0 * t) + 100.0
+        audio_data = np.sin(2 * np.pi * freq * t) * np.exp(-5.0 * t)
+    elif sfx_type == "🔥 Hellstone Explosion / Boom":
+        noise = np.random.uniform(-1, 1, len(t))
+        audio_data = noise * np.exp(-6.0 * t)
+    elif sfx_type == "💎 Crystal Shard Ring":
+        freq = 1760.0 if int(t * 10) % 2 == 0 else 1318.5
+        audio_data = np.sin(2 * np.pi * freq * t) * np.exp(-7.0 * t)
+    elif sfx_type == "🐱 Meowmere Cat Sound":
+        freq = 500.0 + np.sin(t * 50.0) * 150.0 * (1 - t/duration)
+        audio_data = np.sin(2 * np.pi * freq * t) * np.sin(2 * np.pi * 5 * t) * np.exp(-3.0 * t)
+    else:
+        audio_data = np.sin(2 * np.pi * 440.0 * t) * np.exp(-6.0 * t)
+
+    audio_data = np.int16(audio_data * brightness_val * 32767)
+    wav_io = io.BytesIO()
+    import wave
+    with wave.open(wav_io, 'w') as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(audio_data.tobytes())
+    return wav_io.getvalue()
+
 def generate_fitting_preview(sprite_img, slot_type):
     mannequin = Image.new("RGBA", (40, 56), (30, 20, 45, 255))
     head = Image.new("RGBA", (12, 12), (220, 170, 130, 255))
@@ -402,16 +438,21 @@ with tab4:
         st.download_button("💾 Download Motion GIF", data=st.session_state['gif_bytes'], file_name="Motion.gif", mime="image/gif", use_container_width=True)
 
 with tab5:
-    st.subheader("🔊 FX-to-Audio Weapon Synthesizer")
-    sample_rate = 22050
-    t = np.linspace(0, 0.4, int(sample_rate * 0.4), endpoint=False)
-    audio_data = np.int16(np.sin(2 * np.pi * 880.0 * t) * np.exp(-6.0 * t) * 32767)
-    wav_io = io.BytesIO()
-    import wave
-    with wave.open(wav_io, 'w') as f:
-        f.setnchannels(1); f.setsampwidth(2); f.setframerate(sample_rate); f.writeframes(audio_data.tobytes())
-    st.audio(wav_io.getvalue(), format="audio/wav")
-    st.download_button("💾 Download Efek Suara (.wav)", data=wav_io.getvalue(), file_name="SFX.wav", mime="image/png", use_container_width=True)
+    st.subheader("🔊 Expanded FX-to-Audio Weapon Synthesizer")
+    selected_sfx = st.selectbox(
+        "Pilih Jenis Efek Suara Senjata:",
+        [
+            "⚔️ Sword Slash / Melee Swoosh",
+            "🔮 Magic Spell / Mana Chime",
+            "⚡ Laser / Sci-Fi Blaster",
+            "🔥 Hellstone Explosion / Boom",
+            "💎 Crystal Shard Ring",
+            "🐱 Meowmere Cat Sound"
+        ]
+    )
+    audio_bytes = generate_weapon_audio_wav(selected_sfx, brightness)
+    st.audio(audio_bytes, format="audio/wav")
+    st.download_button("💾 Download Efek Suara (.wav)", data=audio_bytes, file_name="TerrariaWeapon_SFX.wav", mime="audio/wav", use_container_width=True)
 
 with tab6:
     st.subheader("💾 Export Center")
