@@ -8,7 +8,7 @@ import streamlit as st
 # 1. KONFIGURASI HALAMAN & THEME UI/UX
 # ==========================================
 st.set_page_config(
-    page_title="Terraria Sprite Master Studio v24.0 Ultimate",
+    page_title="Terraria Sprite Master Studio v24.1 Ultimate",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -48,8 +48,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ Terraria Sprite Master Studio v24.0 Ultimate")
-st.caption("Studio All-in-One: **Separate Glow & Non-Glow Color/Opacity Control**, **GIF Download**, & **Sprite Sheet Builder**.")
+st.title("⚡ Terraria Sprite Master Studio v24.1 Ultimate")
+st.caption("Studio All-in-One: **Pilihan Layout Vertikal/Horizontal Sprite Sheet**, **Separate Glow/Non-Glow Opacity & Color**.")
 
 # ==========================================
 # 2. PRESET PALET WARNA & 15 TEKSTUR LENGKAP
@@ -130,7 +130,7 @@ def on_preset_change():
 # ==========================================
 # 3. TOP CONTROL PANEL
 # ==========================================
-with st.expander("🎛️ PANEL KONTROL STUDIO (WARNA & OPASITAS TERPISAH)", expanded=True):
+with st.expander("🎛️ PANEL KONTROL STUDIO (WARNA, OPASITAS, & TEKSTUR)", expanded=True):
     ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns(4)
 
     with ctrl_col1:
@@ -228,7 +228,6 @@ def render_studio_all(arr, extra_hue=0):
         if (hue_shift + extra_hue) > 0:
             main_rgb = apply_hue_shift(main_rgb, (hue_shift + extra_hue) % 360)
         
-        # Terapkan opasitas terpisah untuk asli
         custom_alpha = alpha.astype(np.float32)
         out_rgb = main_rgb.astype(np.uint8)
         out_img = Image.fromarray(np.dstack((out_rgb, custom_alpha.astype(np.uint8))), mode="RGBA")
@@ -252,11 +251,9 @@ def render_studio_all(arr, extra_hue=0):
         recolored_rgb = np.zeros((height, width, 3), dtype=np.float32)
         mask_low = final_lum < threshold
         
-        # Area Non-Glow dengan opasitas terpisah
         factor_low = np.expand_dims(np.clip(final_lum / threshold, 0, 1), axis=-1)
         recolored_rgb += np.where(np.expand_dims(mask_low, axis=-1), c_shadow + factor_low * (c_nonglow - c_shadow), 0)
 
-        # Area Glow dengan opasitas terpisah
         mask_high = ~mask_low
         factor_high = np.expand_dims(np.clip((final_lum - threshold) / (1.0 - threshold), 0, 1), axis=-1)
         recolored_rgb += np.where(np.expand_dims(mask_high, axis=-1), c_nonglow + factor_high * (c_glow - c_nonglow), 0)
@@ -267,7 +264,6 @@ def render_studio_all(arr, extra_hue=0):
 
         out_rgb = np.clip(recolored_rgb, 0, 255).astype(np.uint8)
         
-        # Pengaturan Alpha / Opasitas Terpisah Berdasarkan Area
         alpha_float = alpha.astype(np.float32) / 255.0
         final_alpha_map = np.where(mask_low, alpha_float * non_glow_opacity, alpha_float * glow_opacity) * 255.0
         
@@ -293,15 +289,23 @@ def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensi
         return shifted
     return out_img
 
-def create_spritesheet(frames, cols, padding=0):
+def create_spritesheet(frames, layout="Vertical (Terraria Style)", padding=0):
     if not frames: return None
     n = len(frames)
-    cols = max(1, min(cols, n))
-    rows = math.ceil(n / cols)
     fw, fh = frames[0].size
+    
+    if "Vertical" in layout:
+        cols = 1
+        rows = n
+    else:
+        cols = n
+        rows = 1
+        
     sheet = Image.new("RGBA", (cols * fw + (cols + 1) * padding, rows * fh + (rows + 1) * padding), (0, 0, 0, 0))
     for idx, frame in enumerate(frames):
-        sheet.paste(frame, (padding + (idx % cols) * (fw + padding), padding + (idx // cols) * (fh + padding)))
+        r = idx // cols if "Vertical" in layout else 0
+        c = idx % cols if "Vertical" in layout else idx
+        sheet.paste(frame, (padding + c * (fw + padding), padding + r * (fh + padding)))
     return sheet
 
 def generate_fitting_preview(sprite_img, slot_type):
@@ -369,10 +373,16 @@ with tab2:
 
 with tab3:
     st.subheader("📊 Custom Sprite Sheet Generator")
-    frame_count = st.slider("Jumlah Frame Animasi:", 2, 20, 8)
+    ss_col1, ss_col2 = st.columns(2)
+    with ss_col1:
+        sheet_layout_choice = st.selectbox("Format Layout Sheet:", ["Vertical (Terraria Style)", "Horizontal (1 Baris Melintang)"])
+        frame_count = st.slider("Jumlah Frame Animasi:", 2, 20, 8)
+    with ss_col2:
+        st.info("Pilih format layout di atas sesuai kebutuhan game kamu.")
+
     if st.button("🚀 Generate Sprite Sheet", use_container_width=True):
         frames = [render_studio_all(arr, extra_hue=(i * (360 // frame_count)))[0] for i in range(frame_count)]
-        ss_img = create_spritesheet(frames, cols=frame_count)
+        ss_img = create_spritesheet(frames, layout=sheet_layout_choice)
         buf = io.BytesIO()
         ss_img.save(buf, format="PNG")
         st.session_state['ss_bytes'] = buf.getvalue()
