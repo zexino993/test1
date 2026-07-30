@@ -8,7 +8,7 @@ import streamlit as st
 # 1. KONFIGURASI HALAMAN & THEME UI/UX
 # ==========================================
 st.set_page_config(
-    page_title="Terraria Sprite Master Studio v23.0 Ultimate",
+    page_title="Terraria Sprite Master Studio v23.1 Ultimate",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -48,8 +48,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ Terraria Sprite Master Studio v23.0 Ultimate")
-st.caption("Studio All-in-One: **GIF Motion Studio**, **Sprite Sheet Builder**, **Color Lock**, **15+ Tekstur 3D**, & **Audio Synth**.")
+st.title("⚡ Terraria Sprite Master Studio v23.1 Ultimate")
+st.caption("Studio All-in-One: **GIF Download Buttons**, **Sprite Sheet Builder**, **Color Lock**, **15+ Tekstur 3D**, & **Audio Synth**.")
 
 # ==========================================
 # 2. PRESET PALET WARNA & 15 TEKSTUR LENGKAP
@@ -468,7 +468,6 @@ out_z = out_img.resize((w * zoom, h * zoom), Image.NEAREST)
 glow_z = glow_img.resize((w * zoom, h * zoom), Image.NEAREST)
 rgb_z = rgb_shift_img.resize((w * zoom, h * zoom), Image.NEAREST)
 
-# KEMBALI LENGKAP DENGAN TAB SPRITE SHEET & GIF MOTION STUDIO!
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "🖼️ Quad Matrix", 
     "🛡️ Character Fitting", 
@@ -542,8 +541,10 @@ with tab5:
             buf_pulse = io.BytesIO()
             frames[0].save(buf_pulse, format="GIF", save_all=True, append_images=frames[1:], duration=90, loop=0)
             st.session_state['pulse_gif_bytes'] = buf_pulse.getvalue()
+        
         if 'pulse_gif_bytes' in st.session_state:
             st.image(st.session_state['pulse_gif_bytes'])
+            st.download_button("💾 Download Motion GIF", data=st.session_state['pulse_gif_bytes'], file_name="TerrariaSprite_Motion.gif", mime="image/gif", use_container_width=True)
 
     with gif_col2:
         if st.button("Preview RGB Cycle GIF 🌈", use_container_width=True):
@@ -551,8 +552,10 @@ with tab5:
             buf_rgb = io.BytesIO()
             frames_rgb[0].save(buf_rgb, format="GIF", save_all=True, append_images=frames_rgb[1:], duration=100, loop=0)
             st.session_state['rgb_gif_bytes'] = buf_rgb.getvalue()
+            
         if 'rgb_gif_bytes' in st.session_state:
             st.image(st.session_state['rgb_gif_bytes'])
+            st.download_button("💾 Download RGB Cycle GIF", data=st.session_state['rgb_gif_bytes'], file_name="TerrariaSprite_RGBCycle.gif", mime="image/gif", use_container_width=True)
 
 with tab6:
     st.subheader("🔊 FX-to-Audio Weapon Synthesizer")
