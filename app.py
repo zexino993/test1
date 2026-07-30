@@ -8,7 +8,7 @@ import streamlit as st
 # 1. KONFIGURASI HALAMAN & THEME UI/UX
 # ==========================================
 st.set_page_config(
-    page_title="Terraria Sprite Master Studio v21.1 Ultimate",
+    page_title="Terraria Sprite Master Studio v22.0 Ultimate",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -48,8 +48,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ Terraria Sprite Master Studio v21.1 Ultimate")
-st.caption("Studio All-in-One: **Original Color Lock**, **15+ Tekstur 3D**, **Selective Merger**, **AI Sketch Forge**, & **Audio Synth**.")
+st.title("⚡ Terraria Sprite Master Studio v22.0 Ultimate")
+st.caption("Studio All-in-One: **Dedicated Glow Preview Tab**, **Color Lock**, **15+ Tekstur 3D**, **Selective Merger**, & **Audio Synth**.")
 
 # ==========================================
 # 2. PRESET PALET WARNA & 15 TEKSTUR LENGKAP
@@ -142,7 +142,6 @@ with st.expander("🎛️ PANEL KONTROL STUDIO (INPUT, COLOR LOCK, & TEKSTUR)", 
         else:
             uploaded_file = None
 
-        # FITUR YANG KEMBALI: Gunakan Warna Asli
         use_orig_color = st.checkbox("🔒 Gunakan Warna Asli (Color Lock)", value=False)
         pastel_mode = st.checkbox("🌸 Soft RGB Pastel Tone", key="pastel_mode_val")
 
@@ -164,7 +163,7 @@ with st.expander("🎛️ PANEL KONTROL STUDIO (INPUT, COLOR LOCK, & TEKSTUR)", 
         st.markdown("##### 🎨 2. Palette & Presets")
         st.selectbox("Pilih Preset Sprite:", options=list(PRESET_NAMES.keys()), format_func=lambda x: PRESET_NAMES.get(x, x), key="preset_choice", on_change=on_preset_change)
         shadow_color = st.color_picker("1. Shadow Celah", key="shadow_picker")
-        mid_color = st.color_picker("2. Warna Utama", key="mid_color")
+        mid_color = st.color_picker("2. Warna Utama", key="mid_picker")
         glow_color = st.color_picker("3. Glow Highlight", key="glow_picker")
         hue_shift = st.slider("RGB Hue Shift", 0, 360, 0, 5)
         vibrancy = st.slider("Saturasi / Vibrancy", 0.5, 2.0, 1.1, 0.1)
@@ -293,7 +292,6 @@ def render_studio_all(arr, extra_hue=0):
     else:
         wand_mask = np.ones((height, width), dtype=bool)
 
-    # KONDISI: Gunakan Warna Asli (Color Lock)
     if use_orig_color:
         main_rgb = np.dstack((r_chan, g_chan, b_chan)).astype(np.float32)
         if (hue_shift + extra_hue) > 0:
@@ -420,10 +418,12 @@ out_z = out_img.resize((w * zoom, h * zoom), Image.NEAREST)
 glow_z = glow_img.resize((w * zoom, h * zoom), Image.NEAREST)
 rgb_z = rgb_shift_img.resize((w * zoom, h * zoom), Image.NEAREST)
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+# KEMBALI LENGKAP DENGAN TAB GLOWMASK DEDIKASI!
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "🖼️ Quad Matrix", 
     "🛡️ Character Fitting", 
     "🧩 3x3 Tile Grid", 
+    "💡 Dedicated Glow Preview",
     "✨ AI Sketch Forge", 
     "🔊 Audio Synth",
     "💾 Export Center"
@@ -454,17 +454,35 @@ with tab3:
     st.image(grid_3x3)
 
 with tab4:
+    st.subheader("💡 Dedicated Glowmask Studio Preview")
+    st.caption("Tab khusus untuk melihat efek pencahayaan bersinar (Glowmask) di atas latar belakang gelap gulita khas malam / gua Terraria.")
+    
+    dark_bg_canvas = Image.new("RGBA", (w * zoom * 2, h * zoom * 2), (10, 5, 20, 255))
+    glow_scaled = glow_z.resize((w * zoom * 2, h * zoom * 2), Image.NEAREST)
+    dark_bg_canvas.alpha_composite(glow_scaled)
+    
+    glow_col1, glow_col2 = st.columns([1, 2])
+    with glow_col1:
+        st.image(dark_bg_canvas, caption="Preview Glow dalam Kegelapan Malam")
+    with glow_col2:
+        st.success("✨ **Glowmask Berjalan Sempurna!**")
+        st.write("Area terang pada sprite akan memancarkan cahaya secara mandiri meskipun di dalam game karakter masuk ke area gua yang gelap.")
+        buf_g = io.BytesIO()
+        glow_img.save(buf_g, format="PNG")
+        st.download_button("💡 Download File Glowmask PNG", data=buf_g.getvalue(), file_name="TerrariaSprite_Glowmask.png", mime="image/png", use_container_width=True)
+
+with tab5:
     st.subheader("✨ AI Sketch-to-Pixel Forge")
     st.info("Pilih template sketsa cepat di bawah untuk diubah instan menjadi Pixel Art Terraria.")
     sketch_choice = st.selectbox("Template Sketsa:", ["Garis Pedang Pendek", "Kapak Perang", "Orb Sihir Kristal"])
 
-with tab5:
+with tab6:
     st.subheader("🔊 FX-to-Audio Weapon Synthesizer")
     audio_bytes = generate_weapon_audio_wav(tex_primary, brightness)
     st.audio(audio_bytes, format="audio/wav")
     st.download_button("💾 Download Efek Suara (.wav)", data=audio_bytes, file_name="TerrariaWeapon_SFX.wav", mime="audio/wav", use_container_width=True)
 
-with tab6:
+with tab7:
     st.subheader("💾 Export Center")
     extracted_colors = extract_palette_from_img(orig_img, num_colors=6)
     if extracted_colors:
