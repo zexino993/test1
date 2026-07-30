@@ -5,10 +5,10 @@ from PIL import Image, ImageEnhance, ImageChops, ImageFilter, ImageDraw
 import streamlit as st
 
 # ==========================================
-# 1. KONFIGURASI HALAMAN & THEME UI/UX
+# 1. KONFIGURASI HALAMAN & MODERN CYBER UI/UX
 # ==========================================
 st.set_page_config(
-    page_title="Terraria Sprite Master Studio v26.0 Ultimate",
+    page_title="Terraria Sprite Master Studio v27.0 Nexus",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -16,43 +16,88 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    .main { background-color: #08040f; }
-    .stAppHeader { background-color: rgba(8, 4, 15, 0.9); }
+    /* Global Theme & Dark Background */
+    .main { background-color: #05020a; }
+    .stAppHeader { background-color: rgba(5, 2, 10, 0.85); backdrop-filter: blur(10px); }
+    
+    /* Modern Glassmorphism Cards */
+    .st-emotion-cache-1wivap2, div[data-testid="stExpander"] {
+        background: linear-gradient(135deg, rgba(20, 10, 35, 0.7), rgba(10, 5, 20, 0.9));
+        border: 1px solid rgba(138, 43, 226, 0.3);
+        border-radius: 14px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        backdrop-filter: blur(8px);
+        padding: 1.2rem;
+        margin-bottom: 1rem;
+    }
+
+    /* Vibrant Buttons */
     .stButton>button {
-        background: linear-gradient(135deg, #7b2cbf, #ff007f);
+        background: linear-gradient(135deg, #7b2cbf, #f72585);
         color: white;
-        border: 1px solid #e0aaff;
-        border-radius: 8px;
-        font-weight: bold;
-        transition: all 0.3s ease;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        padding: 0.5rem 1rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 15px rgba(247, 37, 133, 0.3);
     }
     .stButton>button:hover {
         background: linear-gradient(135deg, #9d4edd, #ff3399);
-        border-color: #ffffff;
-        box-shadow: 0 0 18px rgba(255, 0, 127, 0.8);
+        border-color: #f72585;
+        box-shadow: 0 0 25px rgba(247, 37, 133, 0.7);
+        transform: translateY(-2px);
     }
+
+    /* Inputs & Selectboxes Refinement */
     .stSelectbox, .stSlider, .stColorPicker, .stNumberInput {
-        background-color: #150a24;
-        border-radius: 6px;
+        background-color: rgba(18, 8, 32, 0.6);
+        border-radius: 8px;
     }
-    div[data-testid="stExpander"] {
-        border: 1px solid #480ca8;
+
+    /* Tabs Modernization */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: rgba(12, 6, 22, 0.5);
+        padding: 8px;
         border-radius: 12px;
-        background-color: #10061d;
-        box-shadow: 0 4px 20px rgba(72, 12, 168, 0.3);
+        border: 1px solid rgba(138, 43, 226, 0.2);
     }
+    .stTabs [data-baseweb="tab"] {
+        height: 45px;
+        border-radius: 8px;
+        color: #e0aaff;
+        font-weight: 600;
+        background-color: transparent;
+        border: none;
+    }
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #7b2cbf, #f72585) !important;
+        color: white !important;
+        box-shadow: 0 4px 15px rgba(123, 44, 191, 0.4);
+    }
+
+    /* Headings */
     h1, h2, h3 {
         color: #f72585;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-family: 'Segoe UI', Inter, sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.5px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ Terraria Sprite Master Studio v26.0 Ultimate")
-st.caption("Studio All-in-One: **30+ Expanded Color Palettes**, **25+ 3D Textures**, **Separate Glow/Non-Glow Opacity**, & **Expanded Audio Synth**.")
+# App Header Section
+st.markdown("""
+<div style="padding: 1.5rem 0; text-align: center;">
+    <h1 style="font-size: 2.5rem; margin-bottom: 0px;">⚡ TERRARIA SPRITE MASTER STUDIO <span style="color:#7b2cbf;">v27.0 NEXUS</span></h1>
+    <p style="color: #a085c0; font-size: 1.1rem; margin-top: 5px;">Next-Gen Procedural Sprite Forge, 30+ Palettes, 25+ Textures & Advanced FX Engine</p>
+</div>
+""", unsafe_allow_html=True)
 
 # ==========================================
-# 2. PRESET PALET WARNA (30+ PILIHAN) & TEKSTUR
+# 2. PRESET PALET WARNA (30+) & TEKSTUR
 # ==========================================
 PRESET_NAMES = {
     'manual': 'Custom (Manual)',
@@ -166,13 +211,13 @@ def on_preset_change():
         st.session_state.pastel_mode_val = ('pastel' in p_key)
 
 # ==========================================
-# 3. TOP CONTROL PANEL
+# 3. MODERN CONTROL PANEL (EXPANDER)
 # ==========================================
-with st.expander("🎛️ PANEL KONTROL STUDIO (30+ PALET, OPASITAS, & TEKSTUR)", expanded=True):
+with st.expander("🎛️ STUDIO CONTROL NEXUS (PALETTE, OPACITY, & 3D TEXTURES)", expanded=True):
     ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns(4)
 
     with ctrl_col1:
-        st.markdown("##### 📁 1. Input & Color Lock")
+        st.markdown("##### 📁 1. Input & Engine")
         input_mode = st.radio("Sumber Input Sprite:", ["Upload File PNG", "✨ AI Sketch-to-Pixel Forge"])
         uploaded_file = st.file_uploader("Upload PNG Utama", type=["png"]) if input_mode == "Upload File PNG" else None
 
@@ -182,7 +227,7 @@ with st.expander("🎛️ PANEL KONTROL STUDIO (30+ PALET, OPASITAS, & TEKSTUR)"
         zoom = st.slider("🔍 Zoom Magnifier", 1, 10, 4)
 
     with ctrl_col2:
-        st.markdown("##### 🎨 2. 30+ Palet & Glow Customizer")
+        st.markdown("##### 🎨 2. Palette & Layer Opacity")
         st.selectbox("Pilih Preset Sprite:", options=list(PRESET_NAMES.keys()), format_func=lambda x: PRESET_NAMES.get(x, x), key="preset_choice", on_change=on_preset_change)
         
         st.markdown("**Area Non-Glow (Dasar/Mid):**")
@@ -194,7 +239,7 @@ with st.expander("🎛️ PANEL KONTROL STUDIO (30+ PALET, OPASITAS, & TEKSTUR)"
         glow_opacity = st.slider("Opasitas Glow", 0.0, 1.0, 1.0, 0.05)
 
     with ctrl_col3:
-        st.markdown("##### 🪄 3. Shadow & Outline")
+        st.markdown("##### 🪄 3. Shadow & Outline FX")
         shadow_color = st.color_picker("Warna Shadow Celah", key="shadow_picker")
         hue_shift = st.slider("RGB Hue Shift", 0, 360, 0, 5)
         vibrancy = st.slider("Saturasi / Vibrancy", 0.5, 2.0, 1.1, 0.1)
@@ -203,7 +248,7 @@ with st.expander("🎛️ PANEL KONTROL STUDIO (30+ PALET, OPASITAS, & TEKSTUR)"
         brightness = st.slider("Brightness", 0.5, 2.0, 1.0, 0.05)
 
     with ctrl_col4:
-        st.markdown("##### 🔀 4. Tekstur 3D & Animation")
+        st.markdown("##### 🔀 4. 3D Texture & Motion")
         tex_primary = st.selectbox("Tekstur Utama (25+ Pilihan):", options=TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
         tex_secondary = st.selectbox("Tekstur Kedua:", options=[('Tidak Ada', 'none')] + TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
         blend_ratio = st.slider("Rasio Blend Tekstur", 0.0, 1.0, 0.3, 0.05)
@@ -482,13 +527,13 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 
 with tab1:
     col1, col2, col3, col4 = st.columns(4)
-    col1.caption("1. Asli")
+    col1.markdown("##### 1. Asli")
     col1.image(orig_z, use_container_width=True)
-    col2.caption("2. Master FX")
+    col2.markdown("##### 2. Master FX")
     col2.image(out_z, use_container_width=True)
-    col3.caption("3. Glowmask")
+    col3.markdown("##### 3. Glowmask")
     col3.image(glow_z, use_container_width=True)
-    col4.caption("4. RGB Shift")
+    col4.markdown("##### 4. RGB Shift")
     col4.image(rgb_z, use_container_width=True)
 
 with tab2:
@@ -516,14 +561,26 @@ with tab3:
 
 with tab4:
     st.subheader("🎬 GIF Motion Studio")
-    if st.button("Preview Motion GIF 🎬", use_container_width=True):
-        frames = [generate_pulse_frame(out_img, glow_alpha, i, 12, pulse_intensity, anim_motion_mode).resize((w * zoom, h * zoom), Image.NEAREST) for i in range(12)]
-        buf = io.BytesIO()
-        frames[0].save(buf, format="GIF", save_all=True, append_images=frames[1:], duration=90, loop=0)
-        st.session_state['gif_bytes'] = buf.getvalue()
-    if 'gif_bytes' in st.session_state:
-        st.image(st.session_state['gif_bytes'])
-        st.download_button("💾 Download Motion GIF", data=st.session_state['gif_bytes'], file_name="Motion.gif", mime="image/gif", use_container_width=True)
+    gif_col1, gif_col2 = st.columns(2)
+    with gif_col1:
+        if st.button("Preview Motion GIF 🎬", use_container_width=True):
+            frames = [generate_pulse_frame(out_img, glow_alpha, i, 12, pulse_intensity, anim_motion_mode).resize((w * zoom, h * zoom), Image.NEAREST) for i in range(12)]
+            buf_pulse = io.BytesIO()
+            frames[0].save(buf_pulse, format="GIF", save_all=True, append_images=frames[1:], duration=90, loop=0)
+            st.session_state['pulse_gif_bytes'] = buf_pulse.getvalue()
+        if 'pulse_gif_bytes' in st.session_state:
+            st.image(st.session_state['pulse_gif_bytes'])
+            st.download_button("💾 Download Motion GIF", data=st.session_state['pulse_gif_bytes'], file_name="Motion.gif", mime="image/gif", use_container_width=True)
+
+    with gif_col2:
+        if st.button("Preview RGB Cycle GIF 🌈", use_container_width=True):
+            frames_rgb = [render_studio_all(arr, extra_hue=h_shift)[0].resize((w * zoom, h * zoom), Image.NEAREST) for h_shift in range(0, 360, 30)]
+            buf_rgb = io.BytesIO()
+            frames_rgb[0].save(buf_rgb, format="GIF", save_all=True, append_images=frames_rgb[1:], duration=100, loop=0)
+            st.session_state['rgb_gif_bytes'] = buf_rgb.getvalue()
+        if 'rgb_gif_bytes' in st.session_state:
+            st.image(st.session_state['rgb_gif_bytes'])
+            st.download_button("💾 Download RGB Cycle GIF", data=st.session_state['rgb_gif_bytes'], file_name="RGBCycle.gif", mime="image/gif", use_container_width=True)
 
 with tab5:
     st.subheader("🔊 Expanded FX-to-Audio Weapon Synthesizer")
