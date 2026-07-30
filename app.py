@@ -8,7 +8,7 @@ import streamlit as st
 # 1. KONFIGURASI HALAMAN & THEME UI/UX
 # ==========================================
 st.set_page_config(
-    page_title="Terraria Sprite Master Studio v25.0 Ultimate",
+    page_title="Terraria Sprite Master Studio v26.0 Ultimate",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -48,11 +48,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ Terraria Sprite Master Studio v25.0 Ultimate")
-st.caption("Studio All-in-One: **25+ 3D Procedural Textures**, **Expanded Audio Synth**, **Separate Glow/Non-Glow Color & Opacity**, & **GIF Studio**.")
+st.title("⚡ Terraria Sprite Master Studio v26.0 Ultimate")
+st.caption("Studio All-in-One: **30+ Expanded Color Palettes**, **25+ 3D Textures**, **Separate Glow/Non-Glow Opacity**, & **Expanded Audio Synth**.")
 
 # ==========================================
-# 2. PRESET PALET WARNA & 25+ TEKSTUR LENGKAP
+# 2. PRESET PALET WARNA (30+ PILIHAN) & TEKSTUR
 # ==========================================
 PRESET_NAMES = {
     'manual': 'Custom (Manual)',
@@ -72,7 +72,21 @@ PRESET_NAMES = {
     'cobalt': '🔷 Cobalt Blue',
     'orichalcum': '🌸 Orichalcum Pink',
     'adamantite': '🔴 Adamantite Red',
-    'shroomite': '🍄 Shroomite Cyan'
+    'shroomite': '🍄 Shroomite Cyan',
+    'hallowed': '✨ Hallowed Holy Radiance',
+    'spectre': '👻 Spectre Ghostly Ethereal',
+    'nebula': '🔮 Nebula Arcanum Glow',
+    'solar': '☀️ Solar Flare Ignition',
+    'stardust': '🌠 Stardust Aurora Blue',
+    'vortex': '🌀 Vortex Cybernetic Teal',
+    'frost_legion': '❄️ Frost Legion Ice',
+    'pumpkin_moon': '🎃 Pumpkin Moon Orange',
+    'frost_moon': '🌙 Frost Moon Cyan',
+    'martian_madness': '🛸 Martian Laser Green',
+    'cultist_ritual': '👁️ Ancient Cultist Purple',
+    'fishron': '🦈 Duke Fishron Tsunami',
+    'empress_prismatic': '🦋 Empress Prismatic Rainbow',
+    'moon_lord': '💀 Moon Lord Void Core'
 }
 
 PRESETS = {
@@ -93,7 +107,21 @@ PRESETS = {
     'cobalt': {'shadow': '#001133', 'mid': '#0984e3', 'glow': '#74b9ff'},
     'orichalcum': {'shadow': '#2d001e', 'mid': '#e84393', 'glow': '#ff7675'},
     'adamantite': {'shadow': '#2b0000', 'mid': '#d63031', 'glow': '#ff7675'},
-    'shroomite': {'shadow': '#000a1a', 'mid': '#0055ff', 'glow': '#00e1ff'}
+    'shroomite': {'shadow': '#000a1a', 'mid': '#0055ff', 'glow': '#00e1ff'},
+    'hallowed': {'shadow': '#332900', 'mid': '#ffdd59', 'glow': '#ffffff'},
+    'spectre': {'shadow': '#0f172a', 'mid': '#94a3b8', 'glow': '#e2e8f0'},
+    'nebula': {'shadow': '#2e0854', 'mid': '#b5179e', 'glow': '#f72585'},
+    'solar': {'shadow': '#3d0c02', 'mid': '#ff4800', 'glow': '#ffea00'},
+    'stardust': {'shadow': '#03045e', 'mid': '#0077b6', 'glow': '#90e0ef'},
+    'vortex': {'shadow': '#002626', 'mid': '#009688', 'glow': '#80deea'},
+    'frost_legion': {'shadow': '#001e3d', 'mid': '#4facfe', 'glow': '#ffffff'},
+    'pumpkin_moon': {'shadow': '#3b1400', 'mid': '#ff6b00', 'glow': '#ffea00'},
+    'frost_moon': {'shadow': '#02111b', 'mid': '#00b4d8', 'glow': '#90e0ef'},
+    'martian_madness': {'shadow': '#0f380f', 'mid': '#00ff66', 'glow': '#ccffcc'},
+    'cultist_ritual': {'shadow': '#190033', 'mid': '#7b2cbf', 'glow': '#e0aaff'},
+    'fishron': {'shadow': '#002b3d', 'mid': '#00b4d8', 'glow': '#ade8f4'},
+    'empress_prismatic': {'shadow': '#2d0033', 'mid': '#ff00aa', 'glow': '#00ffff'},
+    'moon_lord': {'shadow': '#0a0518', 'mid': '#432874', 'glow': '#00f5d4'}
 }
 
 TEX_OPTIONS = [
@@ -140,7 +168,7 @@ def on_preset_change():
 # ==========================================
 # 3. TOP CONTROL PANEL
 # ==========================================
-with st.expander("🎛️ PANEL KONTROL STUDIO (WARNA, OPASITAS, & 25+ TEKSTUR)", expanded=True):
+with st.expander("🎛️ PANEL KONTROL STUDIO (30+ PALET, OPASITAS, & TEKSTUR)", expanded=True):
     ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns(4)
 
     with ctrl_col1:
@@ -154,7 +182,7 @@ with st.expander("🎛️ PANEL KONTROL STUDIO (WARNA, OPASITAS, & 25+ TEKSTUR)"
         zoom = st.slider("🔍 Zoom Magnifier", 1, 10, 4)
 
     with ctrl_col2:
-        st.markdown("##### 🎨 2. Non-Glow & Glow Customizer")
+        st.markdown("##### 🎨 2. 30+ Palet & Glow Customizer")
         st.selectbox("Pilih Preset Sprite:", options=list(PRESET_NAMES.keys()), format_func=lambda x: PRESET_NAMES.get(x, x), key="preset_choice", on_change=on_preset_change)
         
         st.markdown("**Area Non-Glow (Dasar/Mid):**")
