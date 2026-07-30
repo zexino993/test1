@@ -8,7 +8,7 @@ import streamlit as st
 # 1. KONFIGURASI HALAMAN & THEME UI/UX
 # ==========================================
 st.set_page_config(
-    page_title="Terraria Sprite Master Studio v22.0 Ultimate",
+    page_title="Terraria Sprite Master Studio v23.0 Ultimate",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -48,8 +48,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ Terraria Sprite Master Studio v22.0 Ultimate")
-st.caption("Studio All-in-One: **Dedicated Glow Preview Tab**, **Color Lock**, **15+ Tekstur 3D**, **Selective Merger**, & **Audio Synth**.")
+st.title("⚡ Terraria Sprite Master Studio v23.0 Ultimate")
+st.caption("Studio All-in-One: **GIF Motion Studio**, **Sprite Sheet Builder**, **Color Lock**, **15+ Tekstur 3D**, & **Audio Synth**.")
 
 # ==========================================
 # 2. PRESET PALET WARNA & 15 TEKSTUR LENGKAP
@@ -185,9 +185,14 @@ with st.expander("🎛️ PANEL KONTROL STUDIO (INPUT, COLOR LOCK, & TEKSTUR)", 
         tex_intensity = st.slider("Kekuatan Tekstur", 0.0, 1.0, 0.35, 0.05)
         depth_mult = st.slider("Intensitas 3D Depth", 0.5, 3.0, 1.5, 0.1)
         threshold = st.slider("Sensitivitas Glow Area", 0.1, 0.9, 0.45, 0.02)
-        anim_motion_mode = st.selectbox("Animasi Motion:", ["Pulse Light Wave", "Floating / Bobbing Up-Down", "360° Weapon Swing", "Sci-Fi Glitch Flicker"])
+        
+        anim_motion_mode = st.selectbox(
+            "Jenis Gerakan Animasi:",
+            ["Pulse Light Wave", "Floating / Bobbing Up-Down", "360° Weapon Swing", "Sci-Fi Glitch Flicker"]
+        )
+        pulse_target = st.selectbox("Target Area Denyut:", ["Hanya Area Glow", "Seluruh Sprite"])
         pulse_direction = st.selectbox("Arah Denyut Pulse:", ["Seperti Biasa (Uniform)", "Dari Atas ⬇️", "Dari Bawah ⬆️"])
-        pulse_intensity = st.slider("Kekuatan Motion", 0.1, 1.0, 0.5, 0.05)
+        pulse_intensity = st.slider("Kekuatan Denyut / Motion", 0.1, 1.0, 0.5, 0.05)
 
 # ==========================================
 # 4. CORE ENGINE & MAPPERS
@@ -350,13 +355,60 @@ def render_studio_all(arr, extra_hue=0):
 
     return out_img, glow_img, lum, glow_alpha
 
+def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensity, p_direction, p_target, motion_mode):
+    if motion_mode == "360° Weapon Swing":
+        angle = (frame_idx / float(total_frames)) * 360.0
+        return out_img.rotate(angle, resample=Image.BICUBIC)
+    elif motion_mode == "Floating / Bobbing Up-Down":
+        offset_y = int(math.sin(2.0 * math.pi * (frame_idx / float(total_frames))) * 4.0 * p_intensity)
+        w, h = out_img.size
+        shifted = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        shifted.paste(out_img, (0, offset_y))
+        return shifted
+    elif motion_mode == "Sci-Fi Glitch Flicker":
+        if frame_idx % 2 == 0: return out_img
+        arr_glitch = np.array(out_img)
+        arr_glitch[:, :, :3] = np.clip(arr_glitch[:, :, :3] * 1.4, 0, 255).astype(np.uint8)
+        return Image.fromarray(arr_glitch, mode="RGBA")
+
+    base_rgb = np.array(out_img, dtype=np.float32)[:, :, :3]
+    alpha_arr = np.array(out_img)[:, :, 3:]
+    height, width = glow_alpha.shape
+    mask_norm = (alpha_arr.astype(np.float32) / 255.0) if p_target == "Seluruh Sprite" else np.expand_dims((glow_alpha.astype(np.float32) / 255.0), axis=-1)
+    t = frame_idx / float(total_frames)
+
+    if p_direction == "Dari Atas ⬇️":
+        y_indices, _ = np.indices((height, width), dtype=np.float32)
+        y_norm = y_indices / max(1.0, height - 1.0)
+        pulse_val = (np.sin(2.0 * np.pi * (t - y_norm)) + 1.0) * 0.5
+    elif p_direction == "Dari Bawah ⬆️":
+        y_indices, _ = np.indices((height, width), dtype=np.float32)
+        y_norm = y_indices / max(1.0, height - 1.0)
+        pulse_val = (np.sin(2.0 * np.pi * (t - (1.0 - y_norm))) + 1.0) * 0.5
+    else:
+        pulse_val = (math.sin(2.0 * math.pi * t) + 1.0) * 0.5
+
+    if isinstance(pulse_val, np.ndarray): pulse_val = np.expand_dims(pulse_val, axis=-1)
+    boosted_rgb = np.clip(base_rgb + (base_rgb * 0.6 + 60.0) * mask_norm * (pulse_val * p_intensity), 0, 255).astype(np.uint8)
+    return Image.fromarray(np.dstack((boosted_rgb, alpha_arr.astype(np.uint8))), mode="RGBA")
+
+def create_spritesheet(frames, cols, padding=0):
+    if not frames: return None
+    n = len(frames)
+    cols = max(1, min(cols, n))
+    rows = math.ceil(n / cols)
+    fw, fh = frames[0].size
+    sheet = Image.new("RGBA", (cols * fw + (cols + 1) * padding, rows * fh + (rows + 1) * padding), (0, 0, 0, 0))
+    for idx, frame in enumerate(frames):
+        sheet.paste(frame, (padding + (idx % cols) * (fw + padding), padding + (idx // cols) * (fh + padding)))
+    return sheet
+
 def generate_weapon_audio_wav(tex_type, brightness_val):
     sample_rate = 22050
     duration = 0.4
     t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
     base_freq = 1200.0 if tex_type == 'crystal' else (880.0 if tex_type == 'sparkle' else 440.0)
-    waveform = np.sin(2 * np.pi * base_freq * t) * np.exp(-6.0 * t) * brightness_val
-    audio_data = np.int16(waveform * 32767)
+    audio_data = np.int16(np.sin(2 * np.pi * base_freq * t) * np.exp(-6.0 * t) * brightness_val * 32767)
     wav_io = io.BytesIO()
     import wave
     with wave.open(wav_io, 'w') as wav_file:
@@ -376,10 +428,8 @@ def generate_fitting_preview(sprite_img, slot_type):
     mannequin.paste(legs, (14, 36))
     fit_canvas = mannequin.copy()
     sp_w, sp_h = sprite_img.size
-    if "Item / Senjata" in slot_type:
-        fit_canvas.paste(sprite_img, (22, 16), sprite_img)
-    else:
-        fit_canvas.paste(sprite_img, ((40 - sp_w)//2, (56 - sp_h)//2), sprite_img)
+    if "Item / Senjata" in slot_type: fit_canvas.paste(sprite_img, (22, 16), sprite_img)
+    else: fit_canvas.paste(sprite_img, ((40 - sp_w)//2, (56 - sp_h)//2), sprite_img)
     return fit_canvas
 
 def extract_palette_from_img(img_rgba, num_colors=6):
@@ -418,13 +468,13 @@ out_z = out_img.resize((w * zoom, h * zoom), Image.NEAREST)
 glow_z = glow_img.resize((w * zoom, h * zoom), Image.NEAREST)
 rgb_z = rgb_shift_img.resize((w * zoom, h * zoom), Image.NEAREST)
 
-# KEMBALI LENGKAP DENGAN TAB GLOWMASK DEDIKASI!
+# KEMBALI LENGKAP DENGAN TAB SPRITE SHEET & GIF MOTION STUDIO!
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "🖼️ Quad Matrix", 
     "🛡️ Character Fitting", 
     "🧩 3x3 Tile Grid", 
-    "💡 Dedicated Glow Preview",
-    "✨ AI Sketch Forge", 
+    "📊 Sprite Sheet Builder", 
+    "🎬 GIF Motion Studio", 
     "🔊 Audio Synth",
     "💾 Export Center"
 ])
@@ -454,27 +504,55 @@ with tab3:
     st.image(grid_3x3)
 
 with tab4:
-    st.subheader("💡 Dedicated Glowmask Studio Preview")
-    st.caption("Tab khusus untuk melihat efek pencahayaan bersinar (Glowmask) di atas latar belakang gelap gulita khas malam / gua Terraria.")
-    
-    dark_bg_canvas = Image.new("RGBA", (w * zoom * 2, h * zoom * 2), (10, 5, 20, 255))
-    glow_scaled = glow_z.resize((w * zoom * 2, h * zoom * 2), Image.NEAREST)
-    dark_bg_canvas.alpha_composite(glow_scaled)
-    
-    glow_col1, glow_col2 = st.columns([1, 2])
-    with glow_col1:
-        st.image(dark_bg_canvas, caption="Preview Glow dalam Kegelapan Malam")
-    with glow_col2:
-        st.success("✨ **Glowmask Berjalan Sempurna!**")
-        st.write("Area terang pada sprite akan memancarkan cahaya secara mandiri meskipun di dalam game karakter masuk ke area gua yang gelap.")
-        buf_g = io.BytesIO()
-        glow_img.save(buf_g, format="PNG")
-        st.download_button("💡 Download File Glowmask PNG", data=buf_g.getvalue(), file_name="TerrariaSprite_Glowmask.png", mime="image/png", use_container_width=True)
+    st.subheader("📊 Custom Sprite Sheet Generator")
+    ss_col1, ss_col2 = st.columns(2)
+    with ss_col1:
+        sheet_anim_type = st.selectbox("Jenis Animasi Frame:", ["Motion Engine Frames", "RGB Rainbow Hue Cycle"])
+        frame_count = st.slider("Jumlah Frame Animasi:", min_value=2, max_value=20, value=8, step=1)
+    with ss_col2:
+        layout_type = st.selectbox("Format Layout Sheet:", ["Vertical Strip (1 Kolom - Format Terraria)", "Horizontal Strip (1 Baris)"])
+        grid_cols = 1 if "Vertical" in layout_type else frame_count
+
+    if st.button("🚀 Generate Sprite Sheet", use_container_width=True):
+        sheet_frames = []
+        for i in range(frame_count):
+            if sheet_anim_type == "Motion Engine Frames":
+                f_img = generate_pulse_frame(out_img, glow_alpha, i, frame_count, pulse_intensity, pulse_direction, pulse_target, anim_motion_mode)
+            else:
+                f_img, _, _, _ = render_studio_all(arr, extra_hue=(i * (360 // frame_count)))
+            sheet_frames.append(f_img)
+        spritesheet_img = create_spritesheet(sheet_frames, cols=grid_cols)
+        buf_ss = io.BytesIO()
+        spritesheet_img.save(buf_ss, format="PNG")
+        st.session_state['spritesheet_bytes'] = buf_ss.getvalue()
+        st.session_state['spritesheet_size'] = spritesheet_img.size
+
+    if 'spritesheet_bytes' in st.session_state:
+        st.divider()
+        sw, sh = st.session_state['spritesheet_size']
+        st.image(Image.open(io.BytesIO(st.session_state['spritesheet_bytes'])).resize((sw * max(1, zoom//2), sh * max(1, zoom//2)), Image.NEAREST))
+        st.download_button("💾 Download Sprite Sheet PNG", data=st.session_state['spritesheet_bytes'], file_name="TerrariaSprite_Sheet.png", mime="image/png", use_container_width=True)
 
 with tab5:
-    st.subheader("✨ AI Sketch-to-Pixel Forge")
-    st.info("Pilih template sketsa cepat di bawah untuk diubah instan menjadi Pixel Art Terraria.")
-    sketch_choice = st.selectbox("Template Sketsa:", ["Garis Pedang Pendek", "Kapak Perang", "Orb Sihir Kristal"])
+    st.subheader("🎬 GIF Motion Studio")
+    gif_col1, gif_col2 = st.columns(2)
+    with gif_col1:
+        if st.button("Preview Motion GIF 🎬", use_container_width=True):
+            frames = [generate_pulse_frame(out_img, glow_alpha, i, 12, pulse_intensity, pulse_direction, pulse_target, anim_motion_mode).resize((w * zoom, h * zoom), Image.NEAREST) for i in range(12)]
+            buf_pulse = io.BytesIO()
+            frames[0].save(buf_pulse, format="GIF", save_all=True, append_images=frames[1:], duration=90, loop=0)
+            st.session_state['pulse_gif_bytes'] = buf_pulse.getvalue()
+        if 'pulse_gif_bytes' in st.session_state:
+            st.image(st.session_state['pulse_gif_bytes'])
+
+    with gif_col2:
+        if st.button("Preview RGB Cycle GIF 🌈", use_container_width=True):
+            frames_rgb = [render_studio_all(arr, extra_hue=h_shift)[0].resize((w * zoom, h * zoom), Image.NEAREST) for h_shift in range(0, 360, 30)]
+            buf_rgb = io.BytesIO()
+            frames_rgb[0].save(buf_rgb, format="GIF", save_all=True, append_images=frames_rgb[1:], duration=100, loop=0)
+            st.session_state['rgb_gif_bytes'] = buf_rgb.getvalue()
+        if 'rgb_gif_bytes' in st.session_state:
+            st.image(st.session_state['rgb_gif_bytes'])
 
 with tab6:
     st.subheader("🔊 FX-to-Audio Weapon Synthesizer")
@@ -490,7 +568,6 @@ with tab7:
         for idx, hex_c in enumerate(extracted_colors):
             cols_pal[idx].color_picker(f"C{idx+1}", hex_c, key=f"p_{idx}")
             cols_pal[idx].code(hex_c)
-            
     st.divider()
     buf_main = io.BytesIO()
     out_img.save(buf_main, format="PNG")
