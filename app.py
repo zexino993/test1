@@ -8,7 +8,7 @@ import streamlit as st
 # 1. KONFIGURASI HALAMAN & THEME UI/UX
 # ==========================================
 st.set_page_config(
-    page_title="Terraria Sprite Master Studio v20.1 Ultimate",
+    page_title="Terraria Sprite Master Studio v21.0 Ultimate",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -16,35 +16,40 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    .main { background-color: #0b0712; }
-    .stAppHeader { background-color: rgba(11, 7, 18, 0.8); }
+    .main { background-color: #08040f; }
+    .stAppHeader { background-color: rgba(8, 4, 15, 0.9); }
     .stButton>button {
-        background: linear-gradient(135deg, #8a2be2, #ff007f);
+        background: linear-gradient(135deg, #7b2cbf, #ff007f);
         color: white;
-        border: 1px solid #d4a5ff;
+        border: 1px solid #e0aaff;
         border-radius: 8px;
         font-weight: bold;
         transition: all 0.3s ease;
     }
     .stButton>button:hover {
-        background: linear-gradient(135deg, #a34bfb, #ff3399);
+        background: linear-gradient(135deg, #9d4edd, #ff3399);
         border-color: #ffffff;
-        box-shadow: 0 0 15px rgba(255, 0, 127, 0.7);
+        box-shadow: 0 0 18px rgba(255, 0, 127, 0.8);
     }
     .stSelectbox, .stSlider, .stColorPicker, .stNumberInput {
-        background-color: #130b21;
+        background-color: #150a24;
         border-radius: 6px;
     }
     div[data-testid="stExpander"] {
-        border: 1px solid #3a1c5d;
-        border-radius: 10px;
-        background-color: #110822;
+        border: 1px solid #480ca8;
+        border-radius: 12px;
+        background-color: #10061d;
+        box-shadow: 0 4px 20px rgba(72, 12, 168, 0.3);
+    }
+    h1, h2, h3 {
+        color: #f72585;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ Terraria Sprite Master Studio v20.1 Ultimate")
-st.caption("Studio All-in-One: **15+ Tekstur Lengkap**, **AI Sketch Forge**, **FX-to-Audio Synthesizer**, **Selective Merger**, & **Motion Engine**.")
+st.title("⚡ Terraria Sprite Master Studio v21.0 Ultimate")
+st.caption("Studio All-in-One: **15+ Tekstur 3D**, **Selective Aspect Merger**, **AI Sketch Forge**, **Audio Synth**, & **Motion Engine**.")
 
 # ==========================================
 # 2. PRESET PALET WARNA & 15 TEKSTUR LENGKAP
@@ -125,18 +130,28 @@ def on_preset_change():
 # ==========================================
 # 3. TOP CONTROL PANEL
 # ==========================================
-with st.expander("🎛️ PANEL KONTROL STUDIO (PENGATURAN SPRITE & TEKSTUR)", expanded=True):
+with st.expander("🎛️ PANEL KONTROL STUDIO (INPUT, MERGER, PALET, & TEKSTUR)", expanded=True):
     ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns(4)
 
     with ctrl_col1:
-        st.markdown("##### 📁 1. Input & AI Forge")
+        st.markdown("##### 📁 1. Input & Selective Merger")
         input_mode = st.radio("Sumber Input Sprite:", ["Upload File PNG", "✨ AI Sketch-to-Pixel Forge"])
         
         if input_mode == "Upload File PNG":
-            uploaded_file = st.file_uploader("Upload Sprite Utama", type=["png"])
+            uploaded_file = st.file_uploader("Upload PNG Utama (Sprite 1)", type=["png"])
         else:
-            st.info("Gunakan tab khusus **AI Sketch Forge** di bawah untuk mencoret sketsa senjata!")
             uploaded_file = None
+
+        enable_aspect_merger = st.checkbox("🧩 Aktifkan Selective Aspect Merger", value=False)
+        uploaded_file_2 = st.file_uploader("Upload PNG Kedua (Sprite 2)", type=["png"])
+        
+        if enable_aspect_merger:
+            merge_aspect_rgb = st.checkbox("🎨 Warna Utama (RGB)", value=True)
+            merge_aspect_glow = st.checkbox("💡 Aspek Glow", value=False)
+            merge_aspect_alpha = st.checkbox("👻 Bentuk Transparansi", value=True)
+            merge_aspect_outline = st.checkbox("✒️ Outline Tepi", value=False)
+            merger_off_x = st.slider("Offset Geser X", -30, 30, 0)
+            merger_off_y = st.slider("Offset Geser Y", -30, 30, 0)
 
         sprite_type = st.selectbox("Jenis Sprite:", ["Item / Senjata / Aksesori", "Tile / Blok / Wall", "Character / NPC / Pet", "Projectiles / FX"])
         zoom = st.slider("🔍 Zoom Magnifier", 1, 10, 4)
@@ -148,27 +163,42 @@ with st.expander("🎛️ PANEL KONTROL STUDIO (PENGATURAN SPRITE & TEKSTUR)", e
         mid_color = st.color_picker("2. Warna Utama", key="mid_picker")
         glow_color = st.color_picker("3. Glow Highlight", key="glow_picker")
         hue_shift = st.slider("RGB Hue Shift", 0, 360, 0, 5)
+        vibrancy = st.slider("Saturasi / Vibrancy", 0.5, 2.0, 1.1, 0.1)
 
     with ctrl_col3:
         st.markdown("##### 🪄 3. Filters & Outline")
+        enable_magic_wand = st.checkbox("🪄 Magic Wand (Target Warna)", value=False)
+        target_magic_color = st.color_picker("Warna Ditukar:", "#FF0000")
+        color_tolerance = st.slider("Toleransi Warna:", 0.0, 1.0, 0.2, 0.02)
         enable_outline = st.checkbox("Tambahkan Auto Outline", value=True)
         outline_thickness = st.slider("Ketebalan Border (px)", 1, 3, 1)
         brightness = st.slider("Brightness", 0.5, 2.0, 1.0, 0.05)
-        contrast = st.slider("Contrast", 0.5, 2.0, 1.0, 0.05)
 
     with ctrl_col4:
-        st.markdown("##### 🔀 4. Tekstur 3D & Audio FX")
-        tex_primary = st.selectbox("Tekstur Utama:", options=TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
+        st.markdown("##### 🔀 4. Tekstur 3D & Animation")
+        tex_primary = st.selectbox("Tekstur Utama (15 Pilihan):", options=TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
+        tex_secondary = st.selectbox("Tekstur Kedua:", options=[('Tidak Ada', 'none')] + TEX_OPTIONS, index=0, format_func=lambda x: x[0])[1]
+        blend_ratio = st.slider("Rasio Blend Tekstur", 0.0, 1.0, 0.3, 0.05)
         tex_intensity = st.slider("Kekuatan Tekstur", 0.0, 1.0, 0.35, 0.05)
         depth_mult = st.slider("Intensitas 3D Depth", 0.5, 3.0, 1.5, 0.1)
         threshold = st.slider("Sensitivitas Glow Area", 0.1, 0.9, 0.45, 0.02)
+        anim_motion_mode = st.selectbox("Animasi Motion:", ["Pulse Light Wave", "Floating / Bobbing Up-Down", "360° Weapon Swing", "Sci-Fi Glitch Flicker"])
+        pulse_direction = st.selectbox("Arah Denyut Pulse:", ["Seperti Biasa (Uniform)", "Dari Atas ⬇️", "Dari Bawah ⬆️"])
+        pulse_intensity = st.slider("Kekuatan Motion", 0.1, 1.0, 0.5, 0.05)
 
 # ==========================================
-# 4. CORE ENGINE & 15 TEXTURE MAPPERS
+# 4. CORE ENGINE & MAPPERS
 # ==========================================
 def hex_to_rgb(hex_str):
     hex_str = hex_str.lstrip('#')
     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
+
+def apply_hue_shift(rgb_array, hue_deg):
+    if hue_deg == 0: return rgb_array
+    img = Image.fromarray(rgb_array.astype(np.uint8), mode='RGB').convert('HSV')
+    h, s, v = img.split()
+    h_arr = (np.array(h, dtype=np.int16) + int((hue_deg / 360.0) * 255)) % 256
+    return np.array(Image.merge('HSV', (Image.fromarray(h_arr.astype(np.uint8)), s, v)).convert('RGB'), dtype=np.float32)
 
 def add_border_to_image(img_rgba, color=(0,0,0,255), thickness=1):
     if thickness == 0: return img_rgba
@@ -179,73 +209,72 @@ def add_border_to_image(img_rgba, color=(0,0,0,255), thickness=1):
     border_img.putalpha(mask)
     return Image.alpha_composite(border_img, img_rgba)
 
+def selective_merge_aspects(img1, img2, use_rgb, use_glow, use_alpha, use_outline, off_x, off_y):
+    if img2 is None: return img1
+    w1, h1 = img1.size
+    w2, h2 = img2.size
+    max_w = max(w1, w2 + abs(off_x))
+    max_h = max(h1, h2 + abs(off_y))
+    canvas1 = Image.new("RGBA", (max_w, max_h), (0, 0, 0, 0))
+    canvas2 = Image.new("RGBA", (max_w, max_h), (0, 0, 0, 0))
+    x1, y1 = (max_w - w1) // 2, (max_h - h1) // 2
+    canvas1.paste(img1, (x1, y1), img1)
+    canvas2.paste(img2, (x1 + off_x, y1 + off_y), img2)
+    arr1, arr2 = np.array(canvas1, dtype=np.float32), np.array(canvas2, dtype=np.float32)
+    out_arr = arr1.copy()
+    if use_rgb:
+        out_arr[:, :, :3] = np.where(arr2[:, :, 3:] > 0, arr2[:, :, :3], out_arr[:, :, :3])
+    if use_alpha:
+        out_arr[:, :, 3] = np.maximum(arr1[:, :, 3], arr2[:, :, 3])
+    if use_glow:
+        lum2 = (0.299 * arr2[:, :, 0] + 0.587 * arr2[:, :, 1] + 0.114 * arr2[:, :, 2]) / 255.0
+        glow_mask2 = (lum2 >= 0.5) & (arr2[:, :, 3] > 0)
+        out_arr[:, :, :3] = np.where(np.expand_dims(glow_mask2, -1), arr2[:, :, :3], out_arr[:, :, :3])
+    return Image.fromarray(np.clip(out_arr, 0, 255).astype(np.uint8), mode="RGBA")
+
 def get_single_texture_map(height, width, tex_type, intensity):
     if tex_type in ['smooth', 'none'] or intensity == 0:
         return np.zeros((height, width), dtype=np.float32)
-
     y_indices, x_indices = np.indices((height, width))
-
     if tex_type == 'stone':
         np.random.seed(42)
-        grain = np.random.uniform(-0.5, 0.5, (height, width))
-        wave = np.sin(x_indices * 0.3) * np.cos(y_indices * 0.3) * 0.3
-        tex = (grain + wave) * intensity
+        tex = (np.random.uniform(-0.5, 0.5, (height, width)) + np.sin(x_indices * 0.3) * 0.3) * intensity
     elif tex_type == 'crystal':
         cell_size = 5
         grid_y, grid_x = y_indices // cell_size, x_indices // cell_size
         hash_val = np.sin(grid_y * 12.9898 + grid_x * 78.233) * 43758.5453
-        facet_val = (hash_val - np.floor(hash_val)) - 0.5
-        edge_y = (y_indices % cell_size == 0).astype(np.float32) * -0.25
-        edge_x = (x_indices % cell_size == 0).astype(np.float32) * -0.25
-        tex = (facet_val + edge_y + edge_x) * intensity
+        tex = ((hash_val - np.floor(hash_val)) - 0.5) * intensity
     elif tex_type == 'sparkle':
         np.random.seed(123)
-        raw_noise = np.random.rand(height, width)
-        tex = np.where(raw_noise > (1.0 - 0.08 * intensity), 0.8, 0.0)
+        tex = np.where(np.random.rand(height, width) > (1.0 - 0.08 * intensity), 0.8, 0.0)
     elif tex_type == 'veins':
-        wave1 = np.sin(x_indices * 0.2 + np.cos(y_indices * 0.15) * 3.0)
-        wave2 = np.cos(y_indices * 0.25 + np.sin(x_indices * 0.1) * 2.5)
-        vein = np.abs(wave1 + wave2)
-        tex = np.where(vein < 0.35, (0.35 - vein) * 2.2, -0.15) * intensity
+        wave = np.sin(x_indices * 0.2 + np.cos(y_indices * 0.15) * 3.0)
+        tex = np.where(np.abs(wave) < 0.35, 0.4, -0.15) * intensity
     elif tex_type == 'obsidian':
-        diag = np.sin((x_indices * 0.4 + y_indices * 0.6))
-        tex = np.where(diag > 0.3, 0.4, -0.25) * intensity
+        tex = np.where(np.sin(x_indices * 0.4 + y_indices * 0.6) > 0.3, 0.4, -0.25) * intensity
     elif tex_type == 'moss':
-        blob = np.sin(x_indices * 0.18) * np.cos(y_indices * 0.18) + np.sin(x_indices * 0.08 + y_indices * 0.08)
-        tex = np.where(blob > 0.3, (blob - 0.3) * 0.9, -0.1) * intensity
+        blob = np.sin(x_indices * 0.18) * np.cos(y_indices * 0.18)
+        tex = np.where(blob > 0.3, 0.4, -0.1) * intensity
     elif tex_type == 'cosmic':
-        center_y, center_x = height / 2.0, width / 2.0
-        r = np.sqrt((x_indices - center_x)**2 + (y_indices - center_y)**2)
-        angle = np.arctan2(y_indices - center_y, x_indices - center_x)
-        tex = np.sin(angle * 3.0 + r * 0.2) * 0.5 * intensity
+        r = np.sqrt((x_indices - width*0.5)**2 + (y_indices - height*0.5)**2)
+        tex = np.sin(r * 0.2) * 0.5 * intensity
     elif tex_type == 'runic':
-        grid_mask = ((x_indices % 4 == 0) | (y_indices % 4 == 0)).astype(np.float32)
-        hash_rune = np.sin((x_indices // 4) * 12.9898 + (y_indices // 4) * 78.233) * 43758.5453
-        rune_pattern = ((hash_rune - np.floor(hash_rune)) > 0.55).astype(np.float32)
-        tex = (grid_mask * rune_pattern * 0.6 - 0.1) * intensity
+        tex = (((x_indices % 4 == 0) | (y_indices % 4 == 0)).astype(np.float32) * 0.5 - 0.1) * intensity
     elif tex_type == 'scale':
-        s_wave = np.sin(x_indices * 0.5 + (y_indices % 4) * 0.8) * np.cos(y_indices * 0.4)
-        tex = np.where(s_wave > 0.2, 0.4, -0.2) * intensity
+        tex = np.where(np.sin(x_indices * 0.5) > 0.2, 0.4, -0.2) * intensity
     elif tex_type == 'wood':
-        ring = np.sin(np.sqrt((x_indices - width*0.5)**2 + (y_indices - height*0.5)**2) * 0.4 + np.sin(y_indices * 0.1) * 2.0)
+        ring = np.sin(np.sqrt((x_indices - width*0.5)**2 + (y_indices - height*0.5)**2) * 0.4)
         tex = ring * 0.35 * intensity
     elif tex_type == 'honey':
-        hex_wave = np.sin(x_indices * 0.4) + np.sin(x_indices * 0.2 + y_indices * 0.35) + np.sin(x_indices * 0.2 - y_indices * 0.35)
-        tex = np.where(hex_wave > 1.2, 0.5, -0.2) * intensity
+        tex = np.where(np.sin(x_indices * 0.4) + np.cos(y_indices * 0.35) > 1.0, 0.5, -0.2) * intensity
     elif tex_type == 'glitch':
-        block_y, block_x = y_indices // 2, x_indices // 4
-        g_noise = np.sin(block_y * 45.12 + block_x * 91.34) * 43758.5453
-        tex = np.where((g_noise - np.floor(g_noise)) > 0.7, 0.6, -0.15) * intensity
+        tex = np.where((x_indices % 6 == 0), 0.6, -0.15) * intensity
     elif tex_type == 'slime':
-        blobs = np.sin(x_indices * 0.25) * np.cos(y_indices * 0.25) + np.cos(x_indices * 0.1 + y_indices * 0.1)
-        tex = np.where(blobs > 0.5, 0.45, -0.1) * intensity
+        tex = np.where(np.sin(x_indices * 0.25) * np.cos(y_indices * 0.25) > 0.5, 0.45, -0.1) * intensity
     elif tex_type == 'frost':
-        shard1 = np.abs(np.sin(x_indices * 0.5 + y_indices * 0.5))
-        shard2 = np.abs(np.cos(x_indices * 0.5 - y_indices * 0.5))
-        tex = (np.maximum(shard1, shard2) - 0.5) * 0.8 * intensity
+        tex = (np.abs(np.sin(x_indices * 0.5 + y_indices * 0.5)) - 0.5) * 0.8 * intensity
     else:
         tex = np.zeros((height, width), dtype=np.float32)
-
     return tex.astype(np.float32)
 
 def render_studio_all(arr, extra_hue=0):
@@ -253,12 +282,21 @@ def render_studio_all(arr, extra_hue=0):
     r_chan, g_chan, b_chan, alpha = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2], arr[:, :, 3]
     lum = (0.299 * r_chan + 0.587 * g_chan + 0.114 * b_chan) / 255.0
 
+    if enable_magic_wand:
+        t_target = np.array(hex_to_rgb(target_magic_color), dtype=np.float32)
+        dist = np.sqrt(np.sum((np.dstack((r_chan, g_chan, b_chan)) - t_target)**2, axis=-1)) / 441.673
+        wand_mask = dist <= color_tolerance
+    else:
+        wand_mask = np.ones((height, width), dtype=bool)
+
     tl_lum = np.pad(lum[:-1, :-1], ((1, 0), (1, 0)), mode='edge')
     br_lum = np.pad(lum[1:, 1:], ((0, 1), (0, 1)), mode='edge')
     slope = (lum - br_lum) + (tl_lum - lum)
-
     depth_lum = np.clip(lum + (slope * 0.35 * depth_mult), 0.0, 1.0)
-    tex_map = get_single_texture_map(height, width, tex_primary, tex_intensity)
+    
+    t1 = get_single_texture_map(height, width, tex_primary, tex_intensity)
+    t2 = get_single_texture_map(height, width, tex_secondary, tex_intensity)
+    tex_map = t1 if tex_secondary == 'none' else (t1 * (1.0 - blend_ratio) + t2 * blend_ratio)
     final_lum = np.clip(depth_lum + tex_map, 0.0, 1.0)
 
     c_shadow = np.array(hex_to_rgb(shadow_color), dtype=np.float32)
@@ -274,6 +312,13 @@ def render_studio_all(arr, extra_hue=0):
     factor_high = np.expand_dims(np.clip((final_lum - 0.35) / 0.65, 0, 1), axis=-1)
     recolored_rgb += np.where(np.expand_dims(mask_high, axis=-1), c_mid + factor_high * (c_glow - c_mid), 0)
 
+    total_hue = (hue_shift + extra_hue) % 360
+    if total_hue > 0:
+        recolored_rgb = apply_hue_shift(recolored_rgb, total_hue)
+
+    gray = np.expand_dims(0.299 * recolored_rgb[:, :, 0] + 0.587 * recolored_rgb[:, :, 1] + 0.114 * recolored_rgb[:, :, 2], axis=-1)
+    recolored_rgb = gray + vibrancy * (recolored_rgb - gray)
+
     out_rgb = np.clip(recolored_rgb, 0, 255).astype(np.uint8)
     alpha_uint8 = alpha.astype(np.uint8)
 
@@ -281,25 +326,35 @@ def render_studio_all(arr, extra_hue=0):
     glow_alpha = np.where((final_lum >= threshold) & (alpha_uint8 > 0), alpha_uint8, 0).astype(np.uint8)
     glow_img = Image.fromarray(np.dstack((out_rgb, glow_alpha)), mode="RGBA")
 
+    if brightness != 1.0:
+        out_img = ImageEnhance.Brightness(out_img).enhance(brightness)
     if enable_outline:
         out_img = add_border_to_image(out_img, color=(0,0,0,255), thickness=outline_thickness)
 
     return out_img, glow_img, lum, glow_alpha
 
+def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensity, p_direction, motion_mode):
+    if motion_mode == "360° Weapon Swing":
+        return out_img.rotate((frame_idx / float(total_frames)) * 360.0, resample=Image.BICUBIC)
+    elif motion_mode == "Floating / Bobbing Up-Down":
+        offset_y = int(math.sin(2.0 * math.pi * (frame_idx / float(total_frames))) * 4.0 * p_intensity)
+        w, h = out_img.size
+        shifted = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        shifted.paste(out_img, (0, offset_y))
+        return shifted
+    elif motion_mode == "Sci-Fi Glitch Flicker" and frame_idx % 2 != 0:
+        arr_glitch = np.array(out_img)
+        arr_glitch[:, :, :3] = np.clip(arr_glitch[:, :, :3] * 1.4, 0, 255).astype(np.uint8)
+        return Image.fromarray(arr_glitch, mode="RGBA")
+    return out_img
+
 def generate_weapon_audio_wav(tex_type, brightness_val):
     sample_rate = 22050
-    duration = 0.5
+    duration = 0.4
     t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
-    
-    base_freq = 440.0
-    if tex_type == 'crystal': base_freq = 1200.0
-    elif tex_type == 'sparkle': base_freq = 880.0
-    elif tex_type == 'veins': base_freq = 220.0
-    
-    envelope = np.exp(-5.0 * t)
-    waveform = np.sin(2 * np.pi * base_freq * t) * envelope * brightness_val
+    base_freq = 1200.0 if tex_type == 'crystal' else (880.0 if tex_type == 'sparkle' else 440.0)
+    waveform = np.sin(2 * np.pi * base_freq * t) * np.exp(-6.0 * t) * brightness_val
     audio_data = np.int16(waveform * 32767)
-    
     wav_io = io.BytesIO()
     import wave
     with wave.open(wav_io, 'w') as wav_file:
@@ -309,69 +364,113 @@ def generate_weapon_audio_wav(tex_type, brightness_val):
         wav_file.writeframes(audio_data.tobytes())
     return wav_io.getvalue()
 
+def generate_fitting_preview(sprite_img, slot_type):
+    mannequin = Image.new("RGBA", (40, 56), (30, 20, 45, 255))
+    head = Image.new("RGBA", (12, 12), (220, 170, 130, 255))
+    body = Image.new("RGBA", (14, 18), (100, 100, 150, 255))
+    legs = Image.new("RGBA", (12, 14), (60, 60, 80, 255))
+    mannequin.paste(head, (14, 6))
+    mannequin.paste(body, (13, 18))
+    mannequin.paste(legs, (14, 36))
+    fit_canvas = mannequin.copy()
+    sp_w, sp_h = sprite_img.size
+    if "Item / Senjata" in slot_type:
+        fit_canvas.paste(sprite_img, (22, 16), sprite_img)
+    else:
+        fit_canvas.paste(sprite_img, ((40 - sp_w)//2, (56 - sp_h)//2), sprite_img)
+    return fit_canvas
+
+def extract_palette_from_img(img_rgba, num_colors=6):
+    colors = img_rgba.convert("RGB").getcolors(maxcolors=10000)
+    if not colors: return []
+    return [f"#{r:02x}{g:02x}{b:02x}" for count, (r, g, b) in sorted(colors, key=lambda x: x[0], reverse=True) if not (r < 10 and g < 10 and b < 10)][:num_colors]
+
 # ==========================================
 # 5. MAIN DASHBOARD & TABS
 # ==========================================
-if uploaded_file is not None:
-    orig_img = Image.open(uploaded_file).convert("RGBA")
+if input_mode == "Upload File PNG":
+    if uploaded_file is not None:
+        orig_img = Image.open(uploaded_file).convert("RGBA")
+    else:
+        orig_img = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
+        d = ImageDraw.Draw(orig_img)
+        d.rectangle([14, 4, 18, 22], fill=(200, 200, 200, 255))
+        d.rectangle([10, 20, 22, 24], fill=(150, 100, 50, 255))
 else:
     orig_img = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
     d = ImageDraw.Draw(orig_img)
-    d.rectangle([14, 4, 18, 22], fill=(200, 200, 200, 255))
-    d.rectangle([10, 20, 22, 24], fill=(150, 100, 50, 255))
+    d.rectangle([14, 2, 18, 24], fill=(255, 255, 255, 255))
+    d.rectangle([10, 20, 22, 24], fill=(200, 150, 50, 255))
+
+if enable_aspect_merger and uploaded_file_2 is not None:
+    orig_img_2 = Image.open(uploaded_file_2).convert("RGBA")
+    orig_img = selective_merge_aspects(orig_img, orig_img_2, merge_aspect_rgb, merge_aspect_glow, merge_aspect_alpha, merge_aspect_outline, merger_off_x, merger_off_y)
 
 arr = np.array(orig_img, dtype=np.float32)
 out_img, glow_img, lum_map, glow_alpha = render_studio_all(arr)
+rgb_shift_img, _, _, _ = render_studio_all(arr, extra_hue=120)
 
 w, h = orig_img.size
 orig_z = orig_img.resize((w * zoom, h * zoom), Image.NEAREST)
 out_z = out_img.resize((w * zoom, h * zoom), Image.NEAREST)
 glow_z = glow_img.resize((w * zoom, h * zoom), Image.NEAREST)
+rgb_z = rgb_shift_img.resize((w * zoom, h * zoom), Image.NEAREST)
 
-tab1, tab2, tab3, tab4 = st.tabs([
-    "🖼️ Live Studio Matrix", 
-    "✨ AI Sketch-to-Pixel Forge", 
-    "🔊 FX-to-Audio Synthesizer",
-    "📊 Export Center"
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    "🖼️ Quad Matrix", 
+    "🛡️ Character Fitting", 
+    "🧩 3x3 Tile Grid", 
+    "✨ AI Sketch Forge", 
+    "🔊 Audio Synth",
+    "💾 Export Center"
 ])
 
 with tab1:
-    col1, col2, col3 = st.columns(3)
-    col1.caption("1. Sprite Asli / Input")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.caption("1. Asli / Merger")
     col1.image(orig_z, use_container_width=True)
-    col2.caption("2. Master Sprite FX")
+    col2.caption("2. Master FX")
     col2.image(out_z, use_container_width=True)
-    col3.caption("3. Glowmask Isolated")
+    col3.caption("3. Glowmask")
     col3.image(glow_z, use_container_width=True)
+    col4.caption("4. RGB Shift")
+    col4.image(rgb_z, use_container_width=True)
 
 with tab2:
-    st.subheader("✨ AI Sketch-to-Pixel Procedural Forge")
-    st.caption("Konversi sketsa cepat menjadi pixel art siap pakai bergaya Terraria.")
-    sk_col1, sk_col2 = st.columns(2)
-    with sk_col1:
-        sketch_choice = st.selectbox("Pilih Template Sketsa Cepat:", ["Garis Pedang Pendek", "Bentuk Kapak Perang", "Orb Sihir / Bola Kristal"])
-        ai_canvas = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
-        d_ai = ImageDraw.Draw(ai_canvas)
-        if "Pedang" in sketch_choice:
-            d_ai.rectangle([14, 2, 18, 22], fill=(255, 255, 255, 255))
-        elif "Kapak" in sketch_choice:
-            d_ai.rectangle([14, 8, 18, 28], fill=(255, 255, 255, 255))
-        else:
-            d_ai.ellipse([8, 8, 24, 24], fill=(255, 255, 255, 255))
-        st.image(ai_canvas.resize((128, 128), Image.NEAREST), caption="Preview Sketsa")
-    with sk_col2:
-        arr_ai = np.array(ai_canvas, dtype=np.float32)
-        out_ai, _, _, _ = render_studio_all(arr_ai)
-        st.image(out_ai.resize((128, 128), Image.NEAREST), caption="Hasil Render Pixel Art AI")
+    st.subheader("🛡️ Terraria Character Fitting Preview")
+    fit_img = generate_fitting_preview(out_img, sprite_type)
+    st.image(fit_img.resize((fit_img.width * max(2, zoom), fit_img.height * max(2, zoom)), Image.NEAREST))
 
 with tab3:
+    st.subheader("🧩 3x3 Tile Seamless Test")
+    grid_3x3 = Image.new("RGBA", (w * zoom * 3, h * zoom * 3), (20, 15, 30, 255))
+    for gy in range(3):
+        for gx in range(3):
+            grid_3x3.paste(out_z, (gx * w * zoom, gy * h * zoom))
+    st.image(grid_3x3)
+
+with tab4:
+    st.subheader("✨ AI Sketch-to-Pixel Forge")
+    st.st_col1, st_col2 = st.columns(2)
+    st.info("Pilih preset sketsa prosedural untuk diubah instan menjadi Pixel Art Terraria.")
+    sketch_choice = st.selectbox("Template Sketsa:", ["Garis Pedang Pendek", "Kapak Perang", "Orb Sihir Kristal"])
+
+with tab5:
     st.subheader("🔊 FX-to-Audio Weapon Synthesizer")
     audio_bytes = generate_weapon_audio_wav(tex_primary, brightness)
     st.audio(audio_bytes, format="audio/wav")
     st.download_button("💾 Download Efek Suara (.wav)", data=audio_bytes, file_name="TerrariaWeapon_SFX.wav", mime="audio/wav", use_container_width=True)
 
-with tab4:
+with tab6:
     st.subheader("💾 Export Center")
+    extracted_colors = extract_palette_from_img(orig_img, num_colors=6)
+    if extracted_colors:
+        cols_pal = st.columns(len(extracted_colors))
+        for idx, hex_c in enumerate(extracted_colors):
+            cols_pal[idx].color_picker(f"C{idx+1}", hex_c, key=f"p_{idx}")
+            cols_pal[idx].code(hex_c)
+            
+    st.divider()
     buf_main = io.BytesIO()
     out_img.save(buf_main, format="PNG")
     st.download_button("💾 Download Main Sprite PNG", data=buf_main.getvalue(), file_name="TerrariaSprite_Main.png", mime="image/png", use_container_width=True)
