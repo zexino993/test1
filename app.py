@@ -8,7 +8,7 @@ import streamlit as st
 # 1. KONFIGURASI HALAMAN & THEME UI/UX
 # ==========================================
 st.set_page_config(
-    page_title="Terraria Sprite Master Studio v21.0 Ultimate",
+    page_title="Terraria Sprite Master Studio v21.1 Ultimate",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -48,8 +48,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ Terraria Sprite Master Studio v21.0 Ultimate")
-st.caption("Studio All-in-One: **15+ Tekstur 3D**, **Selective Aspect Merger**, **AI Sketch Forge**, **Audio Synth**, & **Motion Engine**.")
+st.title("⚡ Terraria Sprite Master Studio v21.1 Ultimate")
+st.caption("Studio All-in-One: **Original Color Lock**, **15+ Tekstur 3D**, **Selective Merger**, **AI Sketch Forge**, & **Audio Synth**.")
 
 # ==========================================
 # 2. PRESET PALET WARNA & 15 TEKSTUR LENGKAP
@@ -130,17 +130,21 @@ def on_preset_change():
 # ==========================================
 # 3. TOP CONTROL PANEL
 # ==========================================
-with st.expander("🎛️ PANEL KONTROL STUDIO (INPUT, MERGER, PALET, & TEKSTUR)", expanded=True):
+with st.expander("🎛️ PANEL KONTROL STUDIO (INPUT, COLOR LOCK, & TEKSTUR)", expanded=True):
     ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns(4)
 
     with ctrl_col1:
-        st.markdown("##### 📁 1. Input & Selective Merger")
+        st.markdown("##### 📁 1. Input & Color Lock")
         input_mode = st.radio("Sumber Input Sprite:", ["Upload File PNG", "✨ AI Sketch-to-Pixel Forge"])
         
         if input_mode == "Upload File PNG":
             uploaded_file = st.file_uploader("Upload PNG Utama (Sprite 1)", type=["png"])
         else:
             uploaded_file = None
+
+        # FITUR YANG KEMBALI: Gunakan Warna Asli
+        use_orig_color = st.checkbox("🔒 Gunakan Warna Asli (Color Lock)", value=False)
+        pastel_mode = st.checkbox("🌸 Soft RGB Pastel Tone", key="pastel_mode_val")
 
         enable_aspect_merger = st.checkbox("🧩 Aktifkan Selective Aspect Merger", value=False)
         uploaded_file_2 = st.file_uploader("Upload PNG Kedua (Sprite 2)", type=["png"])
@@ -160,7 +164,7 @@ with st.expander("🎛️ PANEL KONTROL STUDIO (INPUT, MERGER, PALET, & TEKSTUR)
         st.markdown("##### 🎨 2. Palette & Presets")
         st.selectbox("Pilih Preset Sprite:", options=list(PRESET_NAMES.keys()), format_func=lambda x: PRESET_NAMES.get(x, x), key="preset_choice", on_change=on_preset_change)
         shadow_color = st.color_picker("1. Shadow Celah", key="shadow_picker")
-        mid_color = st.color_picker("2. Warna Utama", key="mid_picker")
+        mid_color = st.color_picker("2. Warna Utama", key="mid_color")
         glow_color = st.color_picker("3. Glow Highlight", key="glow_picker")
         hue_shift = st.slider("RGB Hue Shift", 0, 360, 0, 5)
         vibrancy = st.slider("Saturasi / Vibrancy", 0.5, 2.0, 1.1, 0.1)
@@ -289,42 +293,57 @@ def render_studio_all(arr, extra_hue=0):
     else:
         wand_mask = np.ones((height, width), dtype=bool)
 
-    tl_lum = np.pad(lum[:-1, :-1], ((1, 0), (1, 0)), mode='edge')
-    br_lum = np.pad(lum[1:, 1:], ((0, 1), (0, 1)), mode='edge')
-    slope = (lum - br_lum) + (tl_lum - lum)
-    depth_lum = np.clip(lum + (slope * 0.35 * depth_mult), 0.0, 1.0)
-    
-    t1 = get_single_texture_map(height, width, tex_primary, tex_intensity)
-    t2 = get_single_texture_map(height, width, tex_secondary, tex_intensity)
-    tex_map = t1 if tex_secondary == 'none' else (t1 * (1.0 - blend_ratio) + t2 * blend_ratio)
-    final_lum = np.clip(depth_lum + tex_map, 0.0, 1.0)
+    # KONDISI: Gunakan Warna Asli (Color Lock)
+    if use_orig_color:
+        main_rgb = np.dstack((r_chan, g_chan, b_chan)).astype(np.float32)
+        if (hue_shift + extra_hue) > 0:
+            main_rgb = apply_hue_shift(main_rgb, (hue_shift + extra_hue) % 360)
+        out_img = Image.fromarray(np.dstack((main_rgb.astype(np.uint8), alpha.astype(np.uint8))), mode="RGBA")
+        glow_alpha = np.where((lum >= threshold) & (alpha > 0), alpha, 0).astype(np.uint8)
+        glow_img = Image.fromarray(np.dstack((main_rgb.astype(np.uint8), glow_alpha)), mode="RGBA")
+    else:
+        tl_lum = np.pad(lum[:-1, :-1], ((1, 0), (1, 0)), mode='edge')
+        br_lum = np.pad(lum[1:, 1:], ((0, 1), (0, 1)), mode='edge')
+        slope = (lum - br_lum) + (tl_lum - lum)
+        depth_lum = np.clip(lum + (slope * 0.35 * depth_mult), 0.0, 1.0)
+        
+        t1 = get_single_texture_map(height, width, tex_primary, tex_intensity)
+        t2 = get_single_texture_map(height, width, tex_secondary, tex_intensity)
+        tex_map = t1 if tex_secondary == 'none' else (t1 * (1.0 - blend_ratio) + t2 * blend_ratio)
+        final_lum = np.clip(depth_lum + tex_map, 0.0, 1.0)
 
-    c_shadow = np.array(hex_to_rgb(shadow_color), dtype=np.float32)
-    c_mid = np.array(hex_to_rgb(mid_color), dtype=np.float32)
-    c_glow = np.array(hex_to_rgb(glow_color), dtype=np.float32)
+        c_shadow = np.array(hex_to_rgb(shadow_color), dtype=np.float32)
+        c_mid = np.array(hex_to_rgb(mid_color), dtype=np.float32)
+        c_glow = np.array(hex_to_rgb(glow_color), dtype=np.float32)
 
-    recolored_rgb = np.zeros((height, width, 3), dtype=np.float32)
-    mask_low = final_lum < 0.35
-    factor_low = np.expand_dims(np.clip(final_lum / 0.35, 0, 1), axis=-1)
-    recolored_rgb += np.where(np.expand_dims(mask_low, axis=-1), c_shadow + factor_low * (c_mid - c_shadow), 0)
+        recolored_rgb = np.zeros((height, width, 3), dtype=np.float32)
+        mask_low = final_lum < 0.35
+        factor_low = np.expand_dims(np.clip(final_lum / 0.35, 0, 1), axis=-1)
+        recolored_rgb += np.where(np.expand_dims(mask_low, axis=-1), c_shadow + factor_low * (c_mid - c_shadow), 0)
 
-    mask_high = ~mask_low
-    factor_high = np.expand_dims(np.clip((final_lum - 0.35) / 0.65, 0, 1), axis=-1)
-    recolored_rgb += np.where(np.expand_dims(mask_high, axis=-1), c_mid + factor_high * (c_glow - c_mid), 0)
+        mask_high = ~mask_low
+        factor_high = np.expand_dims(np.clip((final_lum - 0.35) / 0.65, 0, 1), axis=-1)
+        recolored_rgb += np.where(np.expand_dims(mask_high, axis=-1), c_mid + factor_high * (c_glow - c_mid), 0)
 
-    total_hue = (hue_shift + extra_hue) % 360
-    if total_hue > 0:
-        recolored_rgb = apply_hue_shift(recolored_rgb, total_hue)
+        total_hue = (hue_shift + extra_hue) % 360
+        if total_hue > 0:
+            recolored_rgb = apply_hue_shift(recolored_rgb, total_hue)
 
-    gray = np.expand_dims(0.299 * recolored_rgb[:, :, 0] + 0.587 * recolored_rgb[:, :, 1] + 0.114 * recolored_rgb[:, :, 2], axis=-1)
-    recolored_rgb = gray + vibrancy * (recolored_rgb - gray)
+        gray = np.expand_dims(0.299 * recolored_rgb[:, :, 0] + 0.587 * recolored_rgb[:, :, 1] + 0.114 * recolored_rgb[:, :, 2], axis=-1)
+        recolored_rgb = gray + vibrancy * (recolored_rgb - gray)
 
-    out_rgb = np.clip(recolored_rgb, 0, 255).astype(np.uint8)
-    alpha_uint8 = alpha.astype(np.uint8)
+        if st.session_state.pastel_mode_val:
+            recolored_rgb = recolored_rgb * 0.6 + 255.0 * 0.4 * (recolored_rgb / 255.0)**0.5
 
-    out_img = Image.fromarray(np.dstack((out_rgb, alpha_uint8)), mode="RGBA")
-    glow_alpha = np.where((final_lum >= threshold) & (alpha_uint8 > 0), alpha_uint8, 0).astype(np.uint8)
-    glow_img = Image.fromarray(np.dstack((out_rgb, glow_alpha)), mode="RGBA")
+        orig_rgb = np.dstack((r_chan, g_chan, b_chan)).astype(np.float32)
+        out_rgb = np.where(np.expand_dims(wand_mask, axis=-1), recolored_rgb, orig_rgb)
+
+        out_rgb = np.clip(out_rgb, 0, 255).astype(np.uint8)
+        alpha_uint8 = alpha.astype(np.uint8)
+
+        out_img = Image.fromarray(np.dstack((out_rgb, alpha_uint8)), mode="RGBA")
+        glow_alpha = np.where((final_lum >= threshold) & (alpha_uint8 > 0), alpha_uint8, 0).astype(np.uint8)
+        glow_img = Image.fromarray(np.dstack((out_rgb, glow_alpha)), mode="RGBA")
 
     if brightness != 1.0:
         out_img = ImageEnhance.Brightness(out_img).enhance(brightness)
@@ -332,21 +351,6 @@ def render_studio_all(arr, extra_hue=0):
         out_img = add_border_to_image(out_img, color=(0,0,0,255), thickness=outline_thickness)
 
     return out_img, glow_img, lum, glow_alpha
-
-def generate_pulse_frame(out_img, glow_alpha, frame_idx, total_frames, p_intensity, p_direction, motion_mode):
-    if motion_mode == "360° Weapon Swing":
-        return out_img.rotate((frame_idx / float(total_frames)) * 360.0, resample=Image.BICUBIC)
-    elif motion_mode == "Floating / Bobbing Up-Down":
-        offset_y = int(math.sin(2.0 * math.pi * (frame_idx / float(total_frames))) * 4.0 * p_intensity)
-        w, h = out_img.size
-        shifted = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        shifted.paste(out_img, (0, offset_y))
-        return shifted
-    elif motion_mode == "Sci-Fi Glitch Flicker" and frame_idx % 2 != 0:
-        arr_glitch = np.array(out_img)
-        arr_glitch[:, :, :3] = np.clip(arr_glitch[:, :, :3] * 1.4, 0, 255).astype(np.uint8)
-        return Image.fromarray(arr_glitch, mode="RGBA")
-    return out_img
 
 def generate_weapon_audio_wav(tex_type, brightness_val):
     sample_rate = 22050
@@ -451,8 +455,7 @@ with tab3:
 
 with tab4:
     st.subheader("✨ AI Sketch-to-Pixel Forge")
-    st.st_col1, st_col2 = st.columns(2)
-    st.info("Pilih preset sketsa prosedural untuk diubah instan menjadi Pixel Art Terraria.")
+    st.info("Pilih template sketsa cepat di bawah untuk diubah instan menjadi Pixel Art Terraria.")
     sketch_choice = st.selectbox("Template Sketsa:", ["Garis Pedang Pendek", "Kapak Perang", "Orb Sihir Kristal"])
 
 with tab5:
