@@ -20,12 +20,12 @@ def generate_audio(teks, lang='ja'):
     fp.seek(0)
     return fp
 
-# --- DATA KANJI & KUIS KANJI ---
+# --- DATA MATERI KANJI & KUIS ---
 DATA_MATERI_KANJI = [
     {"kanji": "一", "kunyomi": "ひとつ (hitotsu)", "onyomi": "イチ (ichi)", "arti": "Satu", "contoh": "一つ (satu buah)"},
     {"kanji": "二", "kunyomi": "ふたつ (futatsu)", "onyomi": "ニ (ni)", "arti": "Dua", "contoh": "二月 (Februari)"},
     {"kanji": "三", "kunyomi": "みっつ (mittsu)", "onyomi": "サン (san)", "arti": "Tiga", "contoh": "三年 (Tiga tahun)"},
-    {"kanji": "四", "kunyomi": "よっつ (yottsu)", "onyomi": "シ / ヨン (shi/yon)", "arti": "Empat", "contoh": "Four / 四 (yon)"},
+    {"kanji": "四", "kunyomi": "よっつ (yottsu)", "onyomi": "シ / ヨン (shi/yon)", "arti": "Empat", "contoh": "四 (yon)"},
     {"kanji": "五", "kunyomi": "いつつ (itsutsu)", "onyomi": "ゴ (go)", "arti": "Lima", "contoh": "五日 (Tanggal 5)"},
 ]
 
@@ -94,7 +94,7 @@ if menu == "⛩️ Belajar Kanji Dasar":
                 st.write(f"💡 **Contoh:** {item['contoh']}")
 
 # ==============================================================================
-# MODE 2: KUIS KANJI
+# MODE 2: KUIS KANJI (PERBAIKAN STREAMLIT FORM BUG)
 # ==============================================================================
 elif menu == "📝 Kuis Kanji":
     st.title("📝 Kuis Hafalan Kanji Angka")
@@ -108,11 +108,18 @@ elif menu == "📝 Kuis Kanji":
     if "kanji_soal_acak" not in st.session_state:
         st.session_state.kanji_soal_acak = list(enumerate(KUIS_KANJI))
         random.shuffle(st.session_state.kanji_soal_acak)
+    if "sudah_dijawab" not in st.session_state:
+        st.session_state.sudah_dijawab = False
 
     def reset_kanji_kuis():
         st.session_state.kanji_skor = 0
         st.session_state.kanji_idx = 0
+        st.session_state.sudah_dijawab = False
         random.shuffle(st.session_state.kanji_soal_acak)
+
+    def lanjut_soal():
+        st.session_state.kanji_idx += 1
+        st.session_state.sudah_dijawab = False
 
     total_soal = len(KUIS_KANJI)
     curr_idx = st.session_state.kanji_idx
@@ -138,14 +145,20 @@ elif menu == "📝 Kuis Kanji":
             submit_button = st.form_submit_button(label="Jawab 🚀")
             
             if submit_button:
+                st.session_state.sudah_dijawab = True
                 if pilihan == data["jawaban"]:
-                    st.success(f"✨ Benar sekali! Cara bacanya: {data['baca']}")
-                    st.session_state.kanji_skor += 1
+                    st.session_state.jawaban_benar = True
                 else:
-                    st.error(f"❌ Kurang tepat. Jawaban yang benar adalah: **{data['jawaban']}** ({data['baca']})")
+                    st.session_state.jawaban_benar = False
+                    
+        # Menampilkan Feedback & Tombol Lanjut di luar Form
+        if st.session_state.sudah_dijawab:
+            if st.session_state.jawaban_benar:
+                st.success(f"✨ Benar sekali! Cara bacanya: {data['baca']}")
+            else:
+                st.error(f"❌ Kurang tepat. Jawaban yang benar adalah: **{data['jawaban']}** ({data['baca']})")
                 
-                st.session_state.kanji_idx += 1
-                st.button("Lanjut ke Soal Berikutnya ➡️")
+            st.button("Lanjut ke Soal Berikutnya ➡️", on_click=lanjut_soal)
 
     else:
         # Halaman Hasil Akhir
