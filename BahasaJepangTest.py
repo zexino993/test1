@@ -13,181 +13,147 @@ st.set_page_config(
 # --- FUNGSI GENERATE AUDIO DENGAN CACHING ---
 @st.cache_data
 def generate_audio(teks, lang='ja'):
-    """Mengubah teks Jepang menjadi audio bytes di RAM (tidak perlu simpan file di disk)"""
+    """Mengubah teks Jepang menjadi audio bytes di RAM"""
     tts = gTTS(text=teks, lang=lang)
     fp = io.BytesIO()
     tts.write_to_fp(fp)
     fp.seek(0)
     return fp
 
-# --- DATA BELAJAR & KUIS ---
-DATA_KUSI = [
-    {
-        "soal": "あ", 
-        "audio_teks": "あ", 
-        "pilihan": ["a", "i", "u", "e"], 
-        "jawaban": "a", 
-        "tipe": "Hiragana"
-    },
-    {
-        "soal": "い", 
-        "audio_teks": "い", 
-        "pilihan": ["e", "i", "o", "u"], 
-        "jawaban": "i", 
-        "tipe": "Hiragana"
-    },
-    {
-        "soal": "ありがとう", 
-        "audio_teks": "ありがとう", 
-        "pilihan": ["Selamat Pagi", "Terima Kasih", "Selamat Tinggal", "Maaf"], 
-        "jawaban": "Terima Kasih", 
-        "tipe": "Kosakata"
-    },
-    {
-        "soal": "さようなら", 
-        "audio_teks": "さようなら", 
-        "pilihan": ["Halo", "Sampai Jumpa", "Terima Kasih", "Selamat Malam"], 
-        "jawaban": "Sampai Jumpa", 
-        "tipe": "Kosakata"
-    },
-    {
-        "soal": "猫 (Neko)", 
-        "audio_teks": "ねこ", 
-        "pilihan": ["Anjing", "Burung", "Kucing", "Ikan"], 
-        "jawaban": "Kucing", 
-        "tipe": "Kosakata"
-    },
+# --- DATA KANJI & KUIS KANJI ---
+DATA_MATERI_KANJI = [
+    {"kanji": "一", "kunyomi": "ひとつ (hitotsu)", "onyomi": "イチ (ichi)", "arti": "Satu", "contoh": "一つ (satu buah)"},
+    {"kanji": "二", "kunyomi": "ふたつ (futatsu)", "onyomi": "ニ (ni)", "arti": "Dua", "contoh": "二月 (Februari)"},
+    {"kanji": "三", "kunyomi": "みっつ (mittsu)", "onyomi": "サン (san)", "arti": "Tiga", "contoh": "三年 (Tiga tahun)"},
+    {"kanji": "四", "kunyomi": "よっつ (yottsu)", "onyomi": "シ / ヨン (shi/yon)", "arti": "Empat", "contoh": "Four / 四 (yon)"},
+    {"kanji": "五", "kunyomi": "いつつ (itsutsu)", "onyomi": "ゴ (go)", "arti": "Lima", "contoh": "五日 (Tanggal 5)"},
 ]
 
-DATA_FLASHCARD = [
-    {"kanji": "こんにちは", "romaji": "Konnichiwa", "arti": "Halo / Selamat Siang"},
-    {"kanji": "ありがとうございます", "romaji": "Arigatou gozaimasu", "arti": "Terima kasih banyak"},
-    {"kanji": "おいしい", "romaji": "Oishii", "arti": "Enak"},
-    {"kanji": "さようなら", "romaji": "Sayounara", "arti": "Sampai jumpa"},
-    {"kanji": "すみません", "romaji": "Sumimasen", "arti": "Permisi / Maaf"},
+KUIS_KANJI = [
+    {
+        "kanji": "一",
+        "audio": "いち",
+        "pilihan": ["Tiga", "Satu", "Lima", "Dua"],
+        "jawaban": "Satu",
+        "baca": "Ichi / Hitotsu"
+    },
+    {
+        "kanji": "三",
+        "audio": "さん",
+        "pilihan": ["Empat", "Satu", "Tiga", "Dua"],
+        "jawaban": "Tiga",
+        "baca": "San / Mittsu"
+    },
+    {
+        "kanji": "四",
+        "audio": "よん",
+        "pilihan": ["Lima", "Empat", "Dua", "Tiga"],
+        "jawaban": "Empat",
+        "baca": "Yon / Shi"
+    },
+    {
+        "kanji": "五",
+        "audio": "ご",
+        "pilihan": ["Lima", "Satu", "Empat", "Dua"],
+        "jawaban": "Lima",
+        "baca": "Go / Itsutsu"
+    },
+    {
+        "kanji": "二",
+        "audio": "に",
+        "pilihan": ["Tiga", "Dua", "Satu", "Lima"],
+        "jawaban": "Dua",
+        "baca": "Ni / Futatsu"
+    }
 ]
 
 # --- MENU NAVIGASI PADA SIDEBAR ---
 st.sidebar.title("📌 Menu Belajar")
-menu = st.sidebar.radio("Pilih Mode:", ["🎮 Kuis Interaktif", "🎴 Flashcard", "🔊 Coba Pelafalan Bebas"])
+menu = st.sidebar.radio("Pilih Mode:", ["⛩️ Belajar Kanji Dasar", "📝 Kuis Kanji", "🔊 Coba Pelafalan Bebas"])
 
 # ==============================================================================
-# MODE 1: KUIS INTERAKTIF
+# MODE 1: BELAJAR KANJI DASAR
 # ==============================================================================
-if menu == "🎮 Kuis Interaktif":
-    st.title("🎮 Kuis Bahasa Jepang")
-    st.caption("Uji pemahamanmu dan dengarkan suara pelafalannya!")
+if menu == "⛩️ Belajar Kanji Dasar":
+    st.title("⛩️ Modul 1: Kanji Angka Dasar")
+    st.caption("Pelajari bentuk kanji, cara baca Onyomi/Kunyomi, dan dengarkan suaranya.")
+
+    for item in DATA_MATERI_KANJI:
+        with st.container(border=True):
+            col1, col2 = st.columns([1, 2])
+            
+            with col1:
+                st.markdown(f"<h1 style='text-align: center; font-size: 70px;'>{item['kanji']}</h1>", unsafe_allow_html=True)
+                audio_bytes = generate_audio(item["kanji"], lang="ja")
+                st.audio(audio_bytes, format="audio/mp3")
+
+            with col2:
+                st.markdown(f"### Arti: **{item['arti']}**")
+                st.write(f"🇯🇵 **Kunyomi (Jepang):** {item['kunyomi']}")
+                st.write(f"🇨🇳 **Onyomi (Cina):** {item['onyomi']}")
+                st.write(f"💡 **Contoh:** {item['contoh']}")
+
+# ==============================================================================
+# MODE 2: KUIS KANJI
+# ==============================================================================
+elif menu == "📝 Kuis Kanji":
+    st.title("📝 Kuis Hafalan Kanji Angka")
+    st.caption("Uji ingatanmu tentang kanji angka yang baru dipelajari!")
 
     # Inisialisasi State Skor dan Progres
-    if "skor" not in st.session_state:
-        st.session_state.skor = 0
-    if "index_soal" not in st.session_state:
-        st.session_state.index_soal = 0
-    if "soal_acak" not in st.session_state:
-        st.session_state.soal_acak = list(enumerate(DATA_KUSI))
-        random.shuffle(st.session_state.soal_acak)
+    if "kanji_skor" not in st.session_state:
+        st.session_state.kanji_skor = 0
+    if "kanji_idx" not in st.session_state:
+        st.session_state.kanji_idx = 0
+    if "kanji_soal_acak" not in st.session_state:
+        st.session_state.kanji_soal_acak = list(enumerate(KUIS_KANJI))
+        random.shuffle(st.session_state.kanji_soal_acak)
 
-    def reset_kuis():
-        st.session_state.skor = 0
-        st.session_state.index_soal = 0
-        random.shuffle(st.session_state.soal_acak)
+    def reset_kanji_kuis():
+        st.session_state.kanji_skor = 0
+        st.session_state.kanji_idx = 0
+        random.shuffle(st.session_state.kanji_soal_acak)
 
-    total_soal = len(DATA_KUSI)
-    curr_idx = st.session_state.index_soal
+    total_soal = len(KUIS_KANJI)
+    curr_idx = st.session_state.kanji_idx
 
     if curr_idx < total_soal:
-        _, data = st.session_state.soal_acak[curr_idx]
+        _, data = st.session_state.kanji_soal_acak[curr_idx]
         
         # Progress Bar
         st.progress((curr_idx) / total_soal)
-        st.write(f"**Soal {curr_idx + 1} dari {total_soal}** | Kategori: *{data['tipe']}*")
+        st.write(f"**Soal {curr_idx + 1} dari {total_soal}**")
         
         # Header Soal
-        st.markdown(f"### Apa arti / cara baca dari: **{data['soal']}** ?")
+        st.markdown(f"<h1 style='text-align: center; font-size: 80px;'>{data['kanji']}</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center;'>Apa arti dari kanji di atas?</p>", unsafe_allow_html=True)
         
         # Audio Pelafalan
-        audio_bytes = generate_audio(data["audio_teks"], lang="ja")
-        st.write("🔊 **Dengarkan Pelafalan:**")
+        audio_bytes = generate_audio(data["audio"], lang="ja")
         st.audio(audio_bytes, format="audio/mp3")
         
         # Form Pilihan Jawaban
-        with st.form(key=f"form_{curr_idx}"):
+        with st.form(key=f"kanji_form_{curr_idx}"):
             pilihan = st.radio("Pilih jawaban yang benar:", data["pilihan"])
             submit_button = st.form_submit_button(label="Jawab 🚀")
             
             if submit_button:
                 if pilihan == data["jawaban"]:
-                    st.success("✨ Benar sekali! Sugoi!")
-                    st.session_state.skor += 1
+                    st.success(f"✨ Benar sekali! Cara bacanya: {data['baca']}")
+                    st.session_state.kanji_skor += 1
                 else:
-                    st.error(f"❌ Kurang tepat. Jawaban yang benar adalah: **{data['jawaban']}**")
+                    st.error(f"❌ Kurang tepat. Jawaban yang benar adalah: **{data['jawaban']}** ({data['baca']})")
                 
-                st.session_state.index_soal += 1
+                st.session_state.kanji_idx += 1
                 st.button("Lanjut ke Soal Berikutnya ➡️")
 
     else:
         # Halaman Hasil Akhir
         st.balloons()
-        st.success("🎉 Selamat! Kamu telah menyelesaikan kuis.")
-        st.metric(label="Skor Akhir Kamu", value=f"{st.session_state.skor} / {total_soal}")
+        st.success("🎉 Selamat! Kamu telah menyelesaikan Kuis Kanji!")
+        st.metric(label="Skor Akhir Kamu", value=f"{st.session_state.kanji_skor} / {total_soal}")
         
-        persentase = (st.session_state.skor / total_soal) * 100
-        if persentase == 100:
-            st.write("🌟 **Sempurna! Pemahamanmu sangat luar biasa!**")
-        elif persentase >= 60:
-            st.write("👍 **Bagus! Teruskan latihannya.**")
-        else:
-            st.write("💪 **Jangan menyerah, ayo coba lagi!**")
-            
-        st.button("🔄 Ulangi Kuis", on_click=reset_kuis)
-
-# ==============================================================================
-# MODE 2: FLASHCARD
-# ==============================================================================
-elif menu == "🎴 Flashcard":
-    st.title("🎴 Flashcard Hafalan")
-    st.caption("Klik tombol untuk membalik kartu dan mendengarkan suara cara bacanya.")
-
-    if "flash_idx" not in st.session_state:
-        st.session_state.flash_idx = 0
-    if "show_meaning" not in st.session_state:
-        st.session_state.show_meaning = False
-
-    item = DATA_FLASHCARD[st.session_state.flash_idx]
-
-    # Desain Kartu Flashcard
-    with st.container(border=True):
-        st.markdown(f"<h1 style='text-align: center;'>{item['kanji']}</h1>", unsafe_allow_html=True)
-        
-        # Audio
-        audio_card = generate_audio(item["kanji"], lang="ja")
-        st.audio(audio_card, format="audio/mp3")
-
-        st.divider()
-
-        if st.session_state.show_meaning:
-            st.markdown(f"**Cara Baca:** {item['romaji']}")
-            st.markdown(f"**Arti:** {item['arti']}")
-        else:
-            st.info("🔒 Klik tombol 'Balik Kartu' di bawah untuk melihat arti.")
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("⬅️ Sebelumnya"):
-            st.session_state.flash_idx = (st.session_state.flash_idx - 1) % len(DATA_FLASHCARD)
-            st.session_state.show_meaning = False
-            st.rerun()
-
-    with col2:
-        if st.button("🔄 Balik Kartu"):
-            st.session_state.show_meaning = not st.session_state.show_meaning
-            st.rerun()
-
-    with col3:
-        if st.button("Berikutnya ➡️"):
-            st.session_state.flash_idx = (st.session_state.flash_idx + 1) % len(DATA_FLASHCARD)
-            st.session_state.show_meaning = False
-            st.rerun()
+        st.button("🔄 Ulangi Kuis Kanji", on_click=reset_kanji_kuis)
 
 # ==============================================================================
 # MODE 3: PELAFALAN BEBAS
@@ -196,7 +162,7 @@ elif menu == "🔊 Coba Pelafalan Bebas":
     st.title("🔊 Latihan Pelafalan Bebas")
     st.caption("Ketik kalimat atau kata Bahasa Jepang apa saja di sini untuk mendengarkan pengucapannya.")
 
-    user_text = st.text_input("Masukkan teks Jepang:", value="はじめまして、よろしくお願いいたします")
+    user_text = st.text_input("Masukkan teks Jepang:", value="一 二 三 四 五")
 
     if user_text:
         audio_free = generate_audio(user_text, lang="ja")
